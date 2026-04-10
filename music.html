@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>CDFG Music — слушай музыку</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .header {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ff00aa, #00ff88);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 2px;
+        }
+
+        .tagline {
+            font-size: 0.8rem;
+            color: #ff00aa;
+            margin-top: 0.3rem;
+        }
+
+        .search-container {
+            margin: 2rem 0;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 60px;
+            padding: 0.3rem;
+            border: 1px solid rgba(255, 0, 170, 0.3);
+        }
+
+        .search-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 0.8rem 1.2rem;
+            color: #e2e8f0;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .search-box input::placeholder {
+            color: #64748b;
+        }
+
+        .search-box button {
+            background: linear-gradient(135deg, #ff00aa, #00ff88);
+            border: none;
+            border-radius: 60px;
+            padding: 0.8rem 1.5rem;
+            color: #0a0a0a;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .search-box button:hover {
+            transform: scale(1.02);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #ff00aa;
+        }
+
+        .results {
+            margin-top: 2rem;
+        }
+
+        .track-item {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 16px;
+            padding: 1rem;
+            margin-bottom: 0.8rem;
+            transition: all 0.2s;
+            border-left: 3px solid #ff00aa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .track-item:hover {
+            background: rgba(30, 41, 59, 0.8);
+        }
+
+        .track-info {
+            flex: 1;
+        }
+
+        .track-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+
+        .track-artist {
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, #ff00aa, #00ff88);
+            border: none;
+            border-radius: 40px;
+            padding: 0.5rem 1.2rem;
+            color: #0a0a0a;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .no-results, .error {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+
+        /* Плеер */
+        .player {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 0, 170, 0.3);
+            padding: 1rem;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .player.active {
+            transform: translateY(0);
+        }
+
+        .player-info {
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .player-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .player-artist {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .player-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .player-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #e2e8f0;
+            transition: transform 0.2s;
+        }
+
+        .player-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .close-player {
+            position: absolute;
+            right: 1rem;
+            top: 0.5rem;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .info {
+            text-align: center;
+            padding: 1rem;
+            font-size: 0.7rem;
+            color: #475569;
+            margin-bottom: 80px;
+        }
+
+        @media (max-width: 600px) {
+            .container { padding: 1rem; }
+            .search-box button { padding: 0.8rem 1rem; }
+            .track-item { flex-direction: column; align-items: stretch; }
+            .play-btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">CDFG MUSIC</div>
+            <div class="tagline">🎵 слушай бесплатно, без слежки</div>
+        </div>
+
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Название песни или исполнитель..." autocomplete="off">
+                <button id="searchBtn">🔍 Найти</button>
+            </div>
+        </div>
+
+        <div class="results" id="resultsContainer">
+            <div class="no-results">Введите запрос и нажмите «Найти»</div>
+        </div>
+
+        <div class="info">
+            🎧 Музыка предоставлена API | Без истории | Без слежки
+        </div>
+    </div>
+
+    <!-- Плеер -->
+    <div class="player" id="player">
+        <button class="close-player" id="closePlayerBtn">✕</button>
+        <div class="player-info">
+            <div class="player-title" id="playerTitle">Название</div>
+            <div class="player-artist" id="playerArtist">Исполнитель</div>
+        </div>
+        <div class="player-controls">
+            <button class="player-btn" id="prevBtn">⏮</button>
+            <button class="player-btn" id="playPauseBtn">▶</button>
+            <button class="player-btn" id="nextBtn">⏭</button>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const resultsContainer = document.getElementById('resultsContainer');
+        
+        const player = document.getElementById('player');
+        const playerTitle = document.getElementById('playerTitle');
+        const playerArtist = document.getElementById('playerArtist');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const closePlayerBtn = document.getElementById('closePlayerBtn');
+        
+        let currentTrackIndex = 0;
+        let currentPlaylist = [];
+        let audio = new Audio();
+        let isPlaying = false;
+
+        async function search() {
+            const query = searchInput.value.trim();
+            
+            if (query === "") {
+                resultsContainer.innerHTML = '<div class="no-results">Введите запрос</div>';
+                return;
+            }
+
+            resultsContainer.innerHTML = '<div class="loading">🎵 Ищем музыку...</div>';
+
+            try {
+                // Используем JioSaavn API (бесплатный, без ключа)
+                const proxyUrl = 'https://api.allorigins.win/get?url=';
+                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4`;
+                
+                const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
+                const data = await response.json();
+                const jsonData = JSON.parse(data.contents);
+                
+                displayResults(jsonData);
+                
+            } catch (error) {
+                console.error(error);
+                resultsContainer.innerHTML = `
+                    <div class="error">
+                        ⚠️ Ошибка поиска<br>
+                        <small>Попробуйте другой запрос</small>
+                    </div>
+                `;
+            }
+        }
+
+        function displayResults(data) {
+            const results = [];
+            
+            if (data && data.results) {
+                for (let song of data.results) {
+                    if (song.id && song.title) {
+                        results.push({
+                            id: song.id,
+                            title: song.title || 'Без названия',
+                            artist: song.more_info?.artist || 'Неизвестен',
+                            url: song.more_info?.encrypted_media_url || song.perma_url,
+                            image: song.image,
+                            duration: song.more_info?.duration
+                        });
+                    }
+                }
+            }
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        😕 Ничего не найдено по запросу «${escapeHtml(searchInput.value)}»
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            for (let i = 0; i < results.length; i++) {
+                const track = results[i];
+                html += `
+                    <div class="track-item" data-index="${i}">
+                        <div class="track-info">
+                            <div class="track-title">${escapeHtml(track.title)}</div>
+                            <div class="track-artist">${escapeHtml(track.artist)}</div>
+                        </div>
+                        <button class="play-btn" data-index="${i}">▶ Слушать</button>
+                    </div>
+                `;
+            }
+            
+            resultsContainer.innerHTML = html;
+            
+            // Сохраняем плейлист
+            currentPlaylist = results;
+            
+            // Навешиваем обработчики на кнопки "Слушать"
+            document.querySelectorAll('.play-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(btn.dataset.index);
+                    playTrack(index);
+                });
+            });
+        }
+        
+        function playTrack(index) {
+            if (!currentPlaylist[index]) return;
+            
+            currentTrackIndex = index;
+            const track = currentPlaylist[index];
+            
+            playerTitle.textContent = track.title;
+            playerArtist.textContent = track.artist;
+            
+            // JioSaavn требует особый URL для аудио
+            let audioUrl = track.url;
+            if (audioUrl && !audioUrl.startsWith('http')) {
+                audioUrl = 'https:' + audioUrl;
+            }
+            
+            audio.src = audioUrl;
+            audio.load();
+            audio.play().catch(e => {
+                console.error('Ошибка воспроизведения:', e);
+                playerTitle.textContent = 'Не удалось загрузить';
+            });
+            
+            isPlaying = true;
+            playPauseBtn.textContent = '⏸';
+            player.classList.add('active');
+        }
+        
+        function togglePlayPause() {
+            if (isPlaying) {
+                audio.pause();
+                playPauseBtn.textContent = '▶';
+                isPlaying = false;
+            } else {
+                audio.play();
+                playPauseBtn.textContent = '⏸';
+                isPlaying = true;
+            }
+        }
+        
+        function nextTrack() {
+            if (currentPlaylist.length === 0) return;
+            let nextIndex = currentTrackIndex + 1;
+            if (nextIndex >= currentPlaylist.length) nextIndex = 0;
+            playTrack(nextIndex);
+        }
+        
+        function prevTrack() {
+            if (currentPlaylist.length === 0) return;
+            let prevIndex = currentTrackIndex - 1;
+            if (prevIndex < 0) prevIndex = currentPlaylist.length - 1;
+            playTrack(prevIndex);
+        }
+        
+        function closePlayer() {
+            audio.pause();
+            isPlaying = false;
+            player.classList.remove('active');
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        searchBtn.addEventListener('click', search);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') search();
+        });
+        
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        nextBtn.addEventListener('click', nextTrack);
+        prevBtn.addEventListener('click', prevTrack);
+        closePlayerBtn.addEventListener('click', closePlayer);
+        
+        audio.addEventListener('ended', () => {
+            nextTrack();
+        });
+    </script>
+</body>
+  </html>
