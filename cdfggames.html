@@ -186,78 +186,69 @@
         
         let allGames = [];
 
+        // Предопределённый список игр (можно менять здесь)
+        // Формат: { folder: "snake", title: "Змейка", description: "...", genre: "...", rating: "...", icon: "icon.png" }
+        const gamesList = [
+            {
+                folder: "snake",
+                title: "Змейка",
+                description: "Классическая игра. Управляй змейкой, собирай еду и не врезайся в себя",
+                genre: "Аркада",
+                rating: "4.8",
+                icon: "icon.png"
+            }
+            // Добавляй новые игры сюда:
+            // {
+            //     folder: "tetris",
+            //     title: "Тетрис",
+            //     description: "Собирай линии из падающих блоков",
+            //     genre: "Головоломка",
+            //     rating: "4.9",
+            //     icon: "icon.png"
+            // }
+        ];
+
         async function loadGames() {
             gamesGrid.innerHTML = '<div class="loading">🎮 Загрузка игр...</div>';
             
-            try {
-                const listResponse = await fetch('games/list.json');
-                let gameFolders = [];
-                
-                if (listResponse.ok) {
-                    const list = await listResponse.json();
-                    gameFolders = list.games || [];
-                } else {
-                    gamesGrid.innerHTML = `
-                        <div class="no-results">
-                            📁 Нет игр<br>
-                            <small>Создай файл games/list.json со списком папок:<br>
-                            { "games": ["snake", "tetris", "2048"] }</small>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                const games = [];
-                
-                for (const gameFolder of gameFolders) {
-                    try {
-                        const mainCheck = await fetch(`games/${gameFolder}/main.html`, { method: 'HEAD' });
-                        if (!mainCheck.ok) continue;
-                        
-                        const infoResponse = await fetch(`games/${gameFolder}/info.json`);
-                        let gameInfo = {
-                            title: gameFolder,
-                            description: 'Описание отсутствует',
-                            genre: 'Игра',
-                            rating: 'Новинка',
-                            icon: null
-                        };
-                        
-                        if (infoResponse.ok) {
-                            const info = await infoResponse.json();
-                            gameInfo = { ...gameInfo, ...info };
-                        }
-                        
-                        // Проверяем существование иконки
-                        if (gameInfo.icon) {
-                            const iconCheck = await fetch(`games/${gameFolder}/${gameInfo.icon}`, { method: 'HEAD' });
-                            if (!iconCheck.ok) gameInfo.icon = null;
-                        }
-                        
-                        gameInfo.folder = gameFolder;
-                        games.push(gameInfo);
-                    } catch(e) {
-                        console.error(`Ошибка загрузки ${gameFolder}:`, e);
+            const games = [];
+            
+            for (const gameInfo of gamesList) {
+                try {
+                    // Проверяем существование main.html
+                    const mainCheck = await fetch(`games/${gameInfo.folder}/main.html`, { method: 'HEAD' });
+                    if (!mainCheck.ok) {
+                        console.warn(`main.html не найден для ${gameInfo.folder}`);
+                        continue;
                     }
+                    
+                    // Проверяем иконку
+                    let hasIcon = false;
+                    if (gameInfo.icon) {
+                        const iconCheck = await fetch(`games/${gameInfo.folder}/${gameInfo.icon}`, { method: 'HEAD' });
+                        hasIcon = iconCheck.ok;
+                    }
+                    
+                    games.push({
+                        folder: gameInfo.folder,
+                        title: gameInfo.title,
+                        description: gameInfo.description,
+                        genre: gameInfo.genre,
+                        rating: gameInfo.rating,
+                        icon: hasIcon ? gameInfo.icon : null
+                    });
+                } catch(e) {
+                    console.error(`Ошибка загрузки ${gameInfo.folder}:`, e);
                 }
-                
-                allGames = games;
-                displayGames(allGames);
-                
-            } catch (error) {
-                console.error(error);
-                gamesGrid.innerHTML = `
-                    <div class="no-results">
-                        ⚠️ Ошибка загрузки<br>
-                        <small>Создай файл games/list.json со списком папок</small>
-                    </div>
-                `;
             }
+            
+            allGames = games;
+            displayGames(allGames);
         }
 
         function displayGames(games) {
             if (games.length === 0) {
-                gamesGrid.innerHTML = '<div class="no-results">😕 Игры не найдены</div>';
+                gamesGrid.innerHTML = '<div class="no-results">😕 Игры не найдены<br><small>Проверь папки games/ и список в коде</small></div>';
                 return;
             }
             
@@ -289,7 +280,6 @@
                 card.addEventListener('click', () => {
                     const index = parseInt(card.dataset.index);
                     const game = allGames[index];
-                    // Открываем игру в обёртке
                     window.location.href = `game-wrapper.html?game=${encodeURIComponent(game.folder)}&title=${encodeURIComponent(game.title)}`;
                 });
             });
@@ -311,8 +301,7 @@
             
             const filtered = allGames.filter(game => 
                 game.title.toLowerCase().includes(query) ||
-                (game.description && game.description.toLowerCase().includes(query)) ||
-                (game.tags && game.tags.some(tag => tag.toLowerCase().includes(query)))
+                (game.description && game.description.toLowerCase().includes(query))
             );
             displayGames(filtered);
         });
