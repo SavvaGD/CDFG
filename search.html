@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 2rem 1rem;
         }
@@ -87,36 +87,73 @@
             transform: scale(1.02);
         }
 
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #00ff88;
+        }
+
+        .results {
+            margin-top: 2rem;
+        }
+
+        .result-item {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 16px;
+            padding: 1rem;
+            margin-bottom: 0.8rem;
+            transition: all 0.2s;
+            border-left: 3px solid #00ff88;
+        }
+
+        .result-item:hover {
+            background: rgba(30, 41, 59, 0.8);
+        }
+
+        .result-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .result-title a {
+            color: #00ff88;
+            text-decoration: none;
+        }
+
+        .result-title a:hover {
+            text-decoration: underline;
+        }
+
+        .result-url {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-bottom: 0.3rem;
+            word-break: break-all;
+        }
+
+        .result-snippet {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
+
+        .no-results, .error {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+
         .info {
             text-align: center;
             padding: 1rem;
             font-size: 0.7rem;
             color: #475569;
             margin-top: 2rem;
-        }
-
-        .engines {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-            margin-top: 2rem;
-        }
-
-        .engine-btn {
-            background: rgba(30, 41, 59, 0.5);
-            border: 1px solid rgba(0, 255, 136, 0.3);
-            border-radius: 40px;
-            padding: 0.5rem 1rem;
-            color: #94a3b8;
-            cursor: pointer;
-            font-size: 0.8rem;
-            transition: all 0.2s;
-        }
-
-        .engine-btn:hover {
-            border-color: #00ff88;
-            color: #00ff88;
         }
 
         @media (max-width: 600px) {
@@ -139,71 +176,131 @@
             </div>
         </div>
 
-        <div class="engines">
-            <span style="color:#64748b; font-size:0.75rem;">Поиск через:</span>
-            <button class="engine-btn" data-engine="duckduckgo">🦆 DuckDuckGo</button>
-            <button class="engine-btn" data-engine="google">🇬 Google</button>
-            <button class="engine-btn" data-engine="bing">📘 Bing</button>
-            <button class="engine-btn" data-engine="yandex">Яндекс</button>
+        <div class="results" id="resultsContainer">
+            <div class="no-results">Введите запрос и нажмите «Найти»</div>
         </div>
 
         <div class="info">
-            🔒 Анонимный поиск | Без истории | Без слежки | Результаты открываются в этом же окне
+            🔒 Анонимный поиск | Без истории | Без слежки
         </div>
     </div>
 
     <script>
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
-        let currentEngine = 'duckduckgo';
+        const resultsContainer = document.getElementById('resultsContainer');
 
-        // Настройка поисковых систем
-        const searchUrls = {
-            duckduckgo: 'https://duckduckgo.com/?q=',
-            google: 'https://www.google.com/search?q=',
-            bing: 'https://www.bing.com/search?q=',
-            yandex: 'https://yandex.ru/search/?text='
-        };
-
-        // Выбор поисковой системы
-        document.querySelectorAll('.engine-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.engine-btn').forEach(b => {
-                    b.style.borderColor = 'rgba(0, 255, 136, 0.3)';
-                    b.style.color = '#94a3b8';
-                });
-                btn.style.borderColor = '#00ff88';
-                btn.style.color = '#00ff88';
-                currentEngine = btn.dataset.engine;
-                
-                // Если есть текст в поиске — сразу ищем
-                const query = searchInput.value.trim();
-                if (query !== '') {
-                    performSearch(query);
-                }
-            });
-        });
-
-        function performSearch(query) {
-            if (query === '') return;
+        async function search() {
+            const query = searchInput.value.trim();
             
-            const url = searchUrls[currentEngine] + encodeURIComponent(query);
-            // Перенаправляем текущее окно на поисковую выдачу
-            window.location.href = url;
+            if (query === "") {
+                resultsContainer.innerHTML = '<div class="no-results">Введите запрос</div>';
+                return;
+            }
+
+            resultsContainer.innerHTML = '<div class="loading">🔍 Ищем...</div>';
+
+            try {
+                // Используем DuckDuckGo через JSONP (обход CORS)
+                const script = document.createElement('script');
+                const callbackName = 'ddgCallback' + Date.now();
+                
+                window[callbackName] = function(data) {
+                    displayResults(data, query);
+                    delete window[callbackName];
+                    document.body.removeChild(script);
+                };
+                
+                script.src = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&pretty=1&no_html=1&callback=${callbackName}`;
+                document.body.appendChild(script);
+                
+                // Таймаут на случай ошибки
+                setTimeout(() => {
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                        document.body.removeChild(script);
+                        resultsContainer.innerHTML = `
+                            <div class="error">
+                                ⚠️ Превышено время ожидания<br>
+                                <small>Попробуйте другой запрос</small>
+                            </div>
+                        `;
+                    }
+                }, 10000);
+                
+            } catch (error) {
+                resultsContainer.innerHTML = `
+                    <div class="error">
+                        ⚠️ Ошибка поиска<br>
+                        <small>Попробуйте позже</small>
+                    </div>
+                `;
+            }
         }
 
-        searchBtn.addEventListener('click', () => {
-            const query = searchInput.value.trim();
-            if (query === '') return;
-            performSearch(query);
-        });
-
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const query = searchInput.value.trim();
-                if (query === '') return;
-                performSearch(query);
+        function displayResults(data, query) {
+            const results = [];
+            
+            // Основной ответ
+            if (data.AbstractText) {
+                results.push({
+                    title: data.AbstractSource || 'Результат',
+                    url: data.AbstractURL || '#',
+                    snippet: data.AbstractText
+                });
             }
+            
+            // Связанные темы
+            if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+                for (let topic of data.RelatedTopics) {
+                    if (typeof topic === 'object' && topic.Text) {
+                        let text = topic.Text;
+                        let firstLine = text.split('.')[0];
+                        let url = topic.FirstURL || '#';
+                        
+                        results.push({
+                            title: firstLine.length > 60 ? firstLine.substring(0, 60) + '...' : firstLine,
+                            url: url,
+                            snippet: text.length > 200 ? text.substring(0, 200) + '...' : text
+                        });
+                    }
+                    if (results.length >= 15) break;
+                }
+            }
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        😕 Ничего не найдено по запросу «${escapeHtml(query)}»
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            for (let res of results) {
+                html += `
+                    <div class="result-item">
+                        <div class="result-title"><a href="${res.url}" target="_blank">${escapeHtml(res.title)}</a></div>
+                        <div class="result-url">${escapeHtml(res.url)}</div>
+                        <div class="result-snippet">${escapeHtml(res.snippet)}</div>
+                    </div>
+                `;
+            }
+            
+            resultsContainer.innerHTML = html;
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        searchBtn.addEventListener('click', search);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') search();
         });
     </script>
 </body>
