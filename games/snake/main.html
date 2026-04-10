@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Змейка — CDFG Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: system-ui, 'Segoe UI', monospace;
+        }
+
+        .game-container {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 24px;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.2);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 16px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background-color: #0f172a;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .score-box {
+            background: #1e293b;
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 1.3rem;
+            color: #00ff88;
+            font-family: monospace;
+        }
+
+        button {
+            background: linear-gradient(135deg, #00ff88, #00b4d8);
+            border: none;
+            border-radius: 40px;
+            padding: 8px 24px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.02);
+        }
+
+        .back-btn {
+            background: linear-gradient(135deg, #ff00aa, #8b5cf6);
+        }
+
+        .controls {
+            font-size: 0.7rem;
+            color: #64748b;
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .game-container { padding: 12px; }
+            canvas { width: 100%; height: auto; }
+            .score-box { font-size: 1rem; padding: 4px 16px; }
+            button { padding: 6px 16px; font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div class="info-panel">
+        <div class="score-box">🍎 Счёт: <span id="score">0</span></div>
+        <button id="restartBtn">🔄 Новая игра</button>
+        <button id="backBtn" class="back-btn">🏠 Выйти</button>
+    </div>
+    <div class="controls">
+        🎮 Управление: ← ↑ ↓ →  или  WASD
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreSpan = document.getElementById('score');
+
+    // Настройки
+    const gridSize = 20;
+    const cellSize = canvas.width / gridSize;
+
+    let snake = [{x: 10, y: 10}];
+    let direction = 'RIGHT';
+    let nextDirection = 'RIGHT';
+    let food = {x: 15, y: 10};
+    let score = 0;
+    let gameLoop = null;
+    let gameRunning = true;
+
+    function randomFood() {
+        const newFood = {
+            x: Math.floor(Math.random() * gridSize),
+            y: Math.floor(Math.random() * gridSize)
+        };
+        // Проверяем, не появилась ли еда на змейке
+        for (let segment of snake) {
+            if (segment.x === newFood.x && segment.y === newFood.y) {
+                return randomFood();
+            }
+        }
+        return newFood;
+    }
+
+    function draw() {
+        // Очистка
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Рисуем сетку
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= gridSize; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * cellSize, 0);
+            ctx.lineTo(i * cellSize, canvas.height);
+            ctx.stroke();
+            ctx.moveTo(0, i * cellSize);
+            ctx.lineTo(canvas.width, i * cellSize);
+            ctx.stroke();
+        }
+
+        // Рисуем еду
+        ctx.fillStyle = '#ff00aa';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ff00aa';
+        ctx.fillRect(food.x * cellSize + 1, food.y * cellSize + 1, cellSize - 2, cellSize - 2);
+        
+        // Рисуем змейку
+        ctx.shadowBlur = 0;
+        for (let i = 0; i < snake.length; i++) {
+            const seg = snake[i];
+            const gradient = ctx.createLinearGradient(seg.x * cellSize, seg.y * cellSize, (seg.x+1) * cellSize, (seg.y+1) * cellSize);
+            if (i === 0) {
+                gradient.addColorStop(0, '#00ff88');
+                gradient.addColorStop(1, '#00b4d8');
+            } else {
+                gradient.addColorStop(0, '#2dd4bf');
+                gradient.addColorStop(1, '#14b8a6');
+            }
+            ctx.fillStyle = gradient;
+            ctx.fillRect(seg.x * cellSize + 1, seg.y * cellSize + 1, cellSize - 2, cellSize - 2);
+            
+            // Глазки для головы
+            if (i === 0) {
+                ctx.fillStyle = 'white';
+                const eyeSize = cellSize / 6;
+                if (direction === 'RIGHT') {
+                    ctx.fillRect(seg.x * cellSize + cellSize - eyeSize*2, seg.y * cellSize + eyeSize, eyeSize, eyeSize);
+                    ctx.fillRect(seg.x * cellSize + cellSize - eyeSize*2, seg.y * cellSize + cellSize - eyeSize*2, eyeSize, eyeSize);
+                } else if (direction === 'LEFT') {
+                    ctx.fillRect(seg.x * cellSize + eyeSize, seg.y * cellSize + eyeSize, eyeSize, eyeSize);
+                    ctx.fillRect(seg.x * cellSize + eyeSize, seg.y * cellSize + cellSize - eyeSize*2, eyeSize, eyeSize);
+                } else if (direction === 'UP') {
+                    ctx.fillRect(seg.x * cellSize + eyeSize, seg.y * cellSize + eyeSize, eyeSize, eyeSize);
+                    ctx.fillRect(seg.x * cellSize + cellSize - eyeSize*2, seg.y * cellSize + eyeSize, eyeSize, eyeSize);
+                } else {
+                    ctx.fillRect(seg.x * cellSize + eyeSize, seg.y * cellSize + cellSize - eyeSize*2, eyeSize, eyeSize);
+                    ctx.fillRect(seg.x * cellSize + cellSize - eyeSize*2, seg.y * cellSize + cellSize - eyeSize*2, eyeSize, eyeSize);
+                }
+                ctx.fillStyle = 'black';
+                ctx.fillRect(seg.x * cellSize + cellSize - eyeSize*2 + 1, seg.y * cellSize + eyeSize + 1, eyeSize-2, eyeSize-2);
+                ctx.fillRect(seg.x * cellSize + cellSize - eyeSize*2 + 1, seg.y * cellSize + cellSize - eyeSize*2 + 1, eyeSize-2, eyeSize-2);
+            }
+        }
+    }
+
+    function update() {
+        if (!gameRunning) return;
+        
+        direction = nextDirection;
+        
+        // Новая голова
+        let newHead = {...snake[0]};
+        switch(direction) {
+            case 'RIGHT': newHead.x++; break;
+            case 'LEFT': newHead.x--; break;
+            case 'UP': newHead.y--; break;
+            case 'DOWN': newHead.y++; break;
+        }
+        
+        // Проверка столкновения со стенами
+        if (newHead.x < 0 || newHead.x >= gridSize || newHead.y < 0 || newHead.y >= gridSize) {
+            gameOver();
+            return;
+        }
+        
+        // Еда?
+        const ateFood = (newHead.x === food.x && newHead.y === food.y);
+        
+        // Добавляем голову
+        snake.unshift(newHead);
+        if (!ateFood) {
+            snake.pop();
+        } else {
+            score++;
+            scoreSpan.textContent = score;
+            food = randomFood();
+        }
+        
+        // Проверка столкновения с собой
+        for (let i = 1; i < snake.length; i++) {
+            if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) {
+                gameOver();
+                return;
+            }
+        }
+        
+        draw();
+    }
+
+    function gameOver() {
+        if (!gameRunning) return;
+        gameRunning = false;
+        clearInterval(gameLoop);
+        gameLoop = null;
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00ff88';
+        ctx.font = 'bold 24px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 20);
+        ctx.font = '16px monospace';
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillText('Счёт: ' + score, canvas.width/2, canvas.height/2 + 20);
+        ctx.fillText('Нажмите "Новая игра"', canvas.width/2, canvas.height/2 + 60);
+    }
+
+    function restartGame() {
+        if (gameLoop) clearInterval(gameLoop);
+        snake = [{x: 10, y: 10}];
+        direction = 'RIGHT';
+        nextDirection = 'RIGHT';
+        score = 0;
+        scoreSpan.textContent = '0';
+        gameRunning = true;
+        food = randomFood();
+        draw();
+        gameLoop = setInterval(() => update(), 100);
+    }
+
+    function changeDirection(newDir) {
+        if (!gameRunning) return;
+        if ((newDir === 'RIGHT' && direction === 'LEFT') ||
+            (newDir === 'LEFT' && direction === 'RIGHT') ||
+            (newDir === 'UP' && direction === 'DOWN') ||
+            (newDir === 'DOWN' && direction === 'UP')) {
+            return;
+        }
+        nextDirection = newDir;
+    }
+
+    // Управление
+    window.addEventListener('keydown', (e) => {
+        const key = e.key;
+        if (key === 'ArrowUp' || key === 'w' || key === 'W') changeDirection('UP');
+        else if (key === 'ArrowDown' || key === 's' || key === 'S') changeDirection('DOWN');
+        else if (key === 'ArrowLeft' || key === 'a' || key === 'A') changeDirection('LEFT');
+        else if (key === 'ArrowRight' || key === 'd' || key === 'D') changeDirection('RIGHT');
+    });
+    
+    // Сенсорное управление для телефонов
+    let touchStartX = 0, touchStartY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        touchStartX = e.touches[0].clientX - rect.left;
+        touchStartY = e.touches[0].clientY - rect.top;
+    });
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const endX = e.changedTouches[0].clientX - rect.left;
+        const endY = e.changedTouches[0].clientY - rect.top;
+        const dx = endX - touchStartX;
+        const dy = endY - touchStartY;
+        if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 0) changeDirection('RIGHT');
+            else changeDirection('LEFT');
+        } else {
+            if (dy > 0) changeDirection('DOWN');
+            else changeDirection('UP');
+        }
+    });
+
+    document.getElementById('restartBtn').addEventListener('click', restartGame);
+    document.getElementById('backBtn').addEventListener('click', () => {
+        window.location.href = '../index.html';
+    });
+
+    // Старт
+    restartGame();
+</script>
+</body>
+</html>
