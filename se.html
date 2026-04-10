@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>CDFG SE — Site Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .header {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00ff88, #00b4d8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 2px;
+        }
+
+        .tagline {
+            font-size: 0.8rem;
+            color: #00ff88;
+            margin-top: 0.3rem;
+        }
+
+        /* Редактор */
+        .editor-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .code-area {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .code-area h3 {
+            margin-bottom: 0.5rem;
+            color: #00ff88;
+        }
+
+        textarea {
+            width: 100%;
+            height: 500px;
+            background: #0a0a0a;
+            border: 1px solid #00ff88;
+            border-radius: 16px;
+            padding: 1rem;
+            color: #e2e8f0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            resize: vertical;
+            outline: none;
+        }
+
+        .preview-area {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .preview-area h3 {
+            margin-bottom: 0.5rem;
+            color: #00ff88;
+        }
+
+        .preview-frame {
+            width: 100%;
+            height: 500px;
+            background: white;
+            border: 1px solid #00ff88;
+            border-radius: 16px;
+            overflow: auto;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+            justify-content: center;
+        }
+
+        button {
+            background: linear-gradient(135deg, #00ff88, #00b4d8);
+            border: none;
+            border-radius: 40px;
+            padding: 0.6rem 1.2rem;
+            color: #0a0a0a;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.02);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #ff00aa, #8b5cf6);
+        }
+
+        .templates {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+            justify-content: center;
+        }
+
+        .template-btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+
+        .info {
+            text-align: center;
+            padding: 1rem;
+            font-size: 0.7rem;
+            color: #475569;
+        }
+
+        @media (max-width: 768px) {
+            .editor-panel { flex-direction: column; }
+            textarea, .preview-frame { height: 400px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">CDFG SE</div>
+            <div class="tagline">✏️ редактор сайтов — пиши код, смотри результат</div>
+        </div>
+
+        <div class="toolbar">
+            <button id="runBtn">▶ Запустить</button>
+            <button id="clearBtn" class="btn-secondary">🗑 Очистить</button>
+            <button id="saveBtn" class="btn-secondary">💾 Сохранить (скачать)</button>
+            <button id="loadBtn" class="btn-secondary">📂 Загрузить файл</button>
+            <input type="file" id="fileInput" accept=".html,.htm" style="display: none;">
+        </div>
+
+        <div class="templates">
+            <span style="color:#64748b;">Шаблоны:</span>
+            <button class="template-btn" data-template="blank">Пустой</button>
+            <button class="template-btn" data-template="basic">Базовая страница</button>
+            <button class="template-btn" data-template="style">Стильный лендинг</button>
+            <button class="template-btn" data-template="card">Карточка товара</button>
+        </div>
+
+        <div class="editor-panel">
+            <div class="code-area">
+                <h3>📝 HTML код</h3>
+                <textarea id="htmlCode" placeholder="Введите HTML код..."></textarea>
+            </div>
+            <div class="preview-area">
+                <h3>👁️ Предпросмотр</h3>
+                <div class="preview-frame">
+                    <iframe id="preview" title="preview" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+                </div>
+            </div>
+        </div>
+
+        <div class="info">
+            💡 Пиши HTML/CSS/JS в левом окне → нажимай «Запустить» → результат справа<br>
+            🔒 Работает локально, ничего не отправляется на сервер
+        </div>
+    </div>
+
+    <script>
+        const htmlCode = document.getElementById('htmlCode');
+        const preview = document.getElementById('preview');
+        const runBtn = document.getElementById('runBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const loadBtn = document.getElementById('loadBtn');
+        const fileInput = document.getElementById('fileInput');
+
+        // Запуск предпросмотра
+        function runPreview() {
+            const code = htmlCode.value;
+            const blob = new Blob([code], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            preview.src = url;
+            // Чистим URL после загрузки
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        // Очистка редактора
+        function clearEditor() {
+            htmlCode.value = '';
+            preview.src = 'about:blank';
+        }
+
+        // Сохранение файла
+        function saveFile() {
+            const code = htmlCode.value;
+            if (!code.trim()) {
+                alert('Нет кода для сохранения');
+                return;
+            }
+            const blob = new Blob([code], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'site.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Загрузка файла
+        function loadFile() {
+            fileInput.click();
+        }
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                htmlCode.value = evt.target.result;
+                runPreview();
+            };
+            reader.readAsText(file);
+            fileInput.value = '';
+        });
+
+        // Шаблоны
+        const templates = {
+            blank: '',
+            basic: `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой сайт</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        h1 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Привет, мир!</h1>
+    <p>Это моя первая страница.</p>
+</body>
+</html>`,
+            style: `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Стильный лендинг</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            max-width: 500px;
+            margin: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        h1 { color: #333; margin-bottom: 10px; }
+        p { color: #666; margin-bottom: 20px; }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Добро пожаловать!</h1>
+        <p>Это стильный лендинг, созданный в CDFG SE</p>
+        <button onclick="alert('Привет!')">Нажми меня</button>
+    </div>
+</body>
+</html>`,
+            card: `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карточка товара</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #1a1a2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .product-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            max-width: 350px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .product-image {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+        }
+        .product-info {
+            padding: 20px;
+        }
+        h2 { margin: 0 0 10px; color: #333; }
+        .price {
+            font-size: 24px;
+            color: #667eea;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="product-card">
+        <div class="product-image">🛍️</div>
+        <div class="product-info">
+            <h2>Крутой товар</h2>
+            <p>Описание товара. Он очень классный и полезный!</p>
+            <div class="price">1990 ₽</div>
+            <button onclick="alert('Добавлено в корзину')">Купить</button>
+        </div>
+    </div>
+</body>
+</html>`
+        };
+
+        document.querySelectorAll('.template-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const template = btn.dataset.template;
+                if (templates[template] !== undefined) {
+                    htmlCode.value = templates[template];
+                    runPreview();
+                }
+            });
+        });
+
+        runBtn.addEventListener('click', runPreview);
+        clearBtn.addEventListener('click', clearEditor);
+        saveBtn.addEventListener('click', saveFile);
+        loadBtn.addEventListener('click', loadFile);
+
+        // Стартовый пример
+        htmlCode.value = templates.basic;
+        runPreview();
+    </script>
+</body>
+</html>
