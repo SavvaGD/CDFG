@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>CDFG Games — игра</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .game-header {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 255, 136, 0.3);
+            padding: 0.8rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00ff88, #ff00aa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .game-title {
+            font-size: 1rem;
+            color: #00ff88;
+        }
+
+        .exit-btn {
+            background: linear-gradient(135deg, #ff00aa, #8b5cf6);
+            border: none;
+            border-radius: 40px;
+            padding: 0.5rem 1.2rem;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .exit-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .game-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            min-height: 80vh;
+            border: none;
+            border-radius: 20px;
+            background: #0f172a;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.1);
+        }
+
+        @media (max-width: 600px) {
+            .game-header { padding: 0.5rem; }
+            .logo { font-size: 1.2rem; }
+            .game-title { font-size: 0.8rem; }
+            .exit-btn { padding: 0.3rem 0.8rem; font-size: 0.7rem; }
+            iframe { min-height: 85vh; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-header">
+        <div class="logo">CDFG GAMES</div>
+        <div class="game-title" id="gameTitle">Загрузка...</div>
+        <button class="exit-btn" id="exitBtn">🏠 Выйти</button>
+    </div>
+    <div class="game-container">
+        <iframe id="gameFrame" src="about:blank"></iframe>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameFolder = urlParams.get('game');
+        const gameTitle = urlParams.get('title');
+
+        if (gameTitle) {
+            document.getElementById('gameTitle').textContent = gameTitle;
+        }
+
+        if (gameFolder) {
+            document.getElementById('gameFrame').src = `games/${gameFolder}/main.html`;
+        } else {
+            document.getElementById('gameFrame').src = 'about:blank';
+            document.getElementById('gameTitle').textContent = 'Игра не найдена';
+        }
+
+        document.getElementById('exitBtn').addEventListener('click', () => {
+            window.location.href = 'index.html';
+        });
+    </script>
+</body>
+</html>
