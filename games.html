@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>CDFG Games — портал игр</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .header {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00ff88, #ff00aa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 2px;
+        }
+
+        .tagline {
+            font-size: 0.8rem;
+            color: #00ff88;
+            margin-top: 0.3rem;
+        }
+
+        .search-container {
+            margin: 2rem 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .search-box {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 60px;
+            padding: 0.8rem 1.2rem;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            color: #e2e8f0;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .search-box::placeholder {
+            color: #64748b;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #00ff88;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .game-card {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 20px;
+            padding: 1rem;
+            transition: all 0.2s;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            cursor: pointer;
+        }
+
+        .game-card:hover {
+            transform: translateY(-4px);
+            border-color: #00ff88;
+            background: rgba(30, 41, 59, 0.8);
+        }
+
+        .game-icon {
+            width: 100%;
+            height: 160px;
+            background: #1e293b;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin-bottom: 0.8rem;
+        }
+
+        .game-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .game-icon .no-icon {
+            font-size: 3rem;
+        }
+
+        .game-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .game-description {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .game-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #64748b;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+
+        .info {
+            text-align: center;
+            padding: 1rem;
+            font-size: 0.7rem;
+            color: #475569;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 600px) {
+            .container { padding: 1rem; }
+            .games-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">CDFG GAMES</div>
+            <div class="tagline">🎮 бесплатные игры, без слежки</div>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Поиск игр..." autocomplete="off">
+        </div>
+
+        <div class="games-grid" id="gamesGrid">
+            <div class="loading">🎮 Загрузка игр...</div>
+        </div>
+
+        <div class="info">
+            🎮 Добавь папку с игрой в games/ (main.html + info.json) | Без истории | Без слежки
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const gamesGrid = document.getElementById('gamesGrid');
+        
+        let allGames = [];
+
+        // Список известных игр (можно расширять, но игры НЕ зашиты в код)
+        // Просто перебираем возможные папки, проверяем существует ли main.html
+        // ВАЖНО: нужно заранее знать список папок. Без серверного языка мы не можем "просканировать" папку.
+        // Поэтому я сделаю так: если нет манифеста, используем предопределённый список, 
+        // но ты можешь его менять без изменения кода — через внешний JSON файл.
+        
+        // Способ: загружаем список папок из внешнего games/list.json (создаёшь руками)
+        async function loadGames() {
+            gamesGrid.innerHTML = '<div class="loading">🎮 Загрузка игр...</div>';
+            
+            try {
+                // Пытаемся загрузить список папок из games/list.json
+                const listResponse = await fetch('games/list.json');
+                let gameFolders = [];
+                
+                if (listResponse.ok) {
+                    const list = await listResponse.json();
+                    gameFolders = list.games || [];
+                } else {
+                    // Если list.json нет — показываем инструкцию
+                    gamesGrid.innerHTML = `
+                        <div class="no-results">
+                            📁 Нет игр<br>
+                            <small>Создай файл games/list.json со списком папок:<br>
+                            { "games": ["snake", "tetris", "2048"] }</small>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const games = [];
+                
+                for (const gameFolder of gameFolders) {
+                    try {
+                        // Проверяем существование main.html
+                        const mainCheck = await fetch(`games/${gameFolder}/main.html`, { method: 'HEAD' });
+                        if (!mainCheck.ok) continue;
+                        
+                        // Загружаем info.json
+                        const infoResponse = await fetch(`games/${gameFolder}/info.json`);
+                        let gameInfo = {
+                            title: gameFolder,
+                            description: 'Описание отсутствует',
+                            genre: 'Игра',
+                            rating: 'Новинка'
+                        };
+                        
+                        if (infoResponse.ok) {
+                            const info = await infoResponse.json();
+                            gameInfo = { ...gameInfo, ...info };
+                        }
+                        
+                        gameInfo.folder = gameFolder;
+                        games.push(gameInfo);
+                    } catch(e) {
+                        console.error(`Ошибка загрузки ${gameFolder}:`, e);
+                    }
+                }
+                
+                allGames = games;
+                displayGames(allGames);
+                
+            } catch (error) {
+                console.error(error);
+                gamesGrid.innerHTML = `
+                    <div class="no-results">
+                        ⚠️ Ошибка загрузки<br>
+                        <small>Создай файл games/list.json со списком папок</small>
+                    </div>
+                `;
+            }
+        }
+
+        function displayGames(games) {
+            if (games.length === 0) {
+                gamesGrid.innerHTML = '<div class="no-results">😕 Игры не найдены</div>';
+                return;
+            }
+            
+            let html = '';
+            for (let i = 0; i < games.length; i++) {
+                const game = games[i];
+                const iconHtml = game.icon 
+                    ? `<img src="games/${game.folder}/${game.icon}" alt="${game.title}">`
+                    : `<div class="no-icon">🎮</div>`;
+                
+                html += `
+                    <div class="game-card" data-index="${i}">
+                        <div class="game-icon">
+                            ${iconHtml}
+                        </div>
+                        <div class="game-title">${escapeHtml(game.title)}</div>
+                        <div class="game-description">${escapeHtml(game.description || '')}</div>
+                        <div class="game-meta">
+                            <span>⭐ ${escapeHtml(game.rating || 'Новинка')}</span>
+                            <span>🎮 ${escapeHtml(game.genre || 'Игра')}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            gamesGrid.innerHTML = html;
+            
+            document.querySelectorAll('.game-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const index = parseInt(card.dataset.index);
+                    const game = allGames[index];
+                    window.location.href = `games/${game.folder}/main.html`;
+                });
+            });
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.toLowerCase().trim();
+            if (query === '') {
+                displayGames(allGames);
+                return;
+            }
+            
+            const filtered = allGames.filter(game => 
+                game.title.toLowerCase().includes(query) ||
+                (game.description && game.description.toLowerCase().includes(query)) ||
+                (game.tags && game.tags.some(tag => tag.toLowerCase().includes(query)))
+            );
+            displayGames(filtered);
+        });
+
+        loadGames();
+    </script>
+</body>
+      </html>
