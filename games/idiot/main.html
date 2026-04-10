@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Похождения Идиота - Игра про глупость</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(145deg, #1a472a 0%, #0e2a1a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'Segoe UI', 'Press Start 2P', monospace;
+            cursor: default;
+        }
+
+        .game-container {
+            background: #2b1e0f;
+            padding: 20px 25px 25px 25px;
+            border-radius: 60px 60px 40px 40px;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.5), inset 0 1px 4px rgba(255,255,200,0.2);
+            border-bottom: 6px solid #5d3a1a;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            cursor: pointer;
+            background-color: #87CEEB;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            background: #1e160c;
+            color: #f7e05e;
+            text-shadow: 2px 2px 0 #5a3e1a;
+            padding: 12px 20px;
+            margin-top: 20px;
+            border-radius: 100px;
+            font-weight: bold;
+            font-size: 1.4rem;
+            gap: 20px;
+            flex-wrap: wrap;
+            border: 1px solid #e0b05e;
+        }
+
+        .stat {
+            background: #00000066;
+            padding: 5px 15px;
+            border-radius: 30px;
+            backdrop-filter: blur(2px);
+            letter-spacing: 1px;
+        }
+
+        .stat span {
+            color: #ffd966;
+            font-size: 1.6rem;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .button-reset {
+            background: #c97e2a;
+            border: none;
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 1.2rem;
+            padding: 5px 20px;
+            border-radius: 40px;
+            color: #2d1d06;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 4px 0 #6b3c0c;
+            transform: translateY(-2px);
+        }
+
+        .button-reset:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #6b3c0c;
+        }
+
+        .quote {
+            background: #000000aa;
+            margin-top: 15px;
+            text-align: center;
+            padding: 8px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            color: #ffe2a4;
+            font-style: italic;
+        }
+
+        @media (max-width: 550px) {
+            .game-container { padding: 12px 18px 20px; }
+            .stat { font-size: 1rem; padding: 3px 12px; }
+            .stat span { font-size: 1.3rem; }
+            .info-panel { gap: 10px; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+<div>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="info-panel">
+            <div class="stat">🧠 УМ ИДИОТА: <span id="stupidityValue">100</span>%</div>
+            <div class="stat">🤕 БОЛИТ ГОЛОВА: <span id="painValue">0</span></div>
+            <div class="stat">⭐ СЛАВА ДУРАКА: <span id="fameValue">0</span></div>
+            <button class="button-reset" id="resetGame">🤪 НАЧАТЬ ЗАНОВО</button>
+        </div>
+        <div class="quote" id="messageBox">👇 ЖМИ НА ИДИОТА! Собирай гениальные глупости...</div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ---------- ХУДОЖЕСТВЕННЫЙ МИР ИДИОТА ----------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Игровые параметры
+        let stupidity = 100;      // Уровень идиотизма (0 - "слишком умный, чтобы жить" -> проигрыш)
+        let headache = 0;         // Боль в голове (если >100, проигрыш от перенапряжения)
+        let fame = 0;             // Очки славы дурака (победа при 500)
+        
+        let gameRunning = true;
+        let gameWin = false;
+        
+        // Объекты на карте (то, с чем взаимодействует идиот)
+        let items = [];
+        
+        // Главный герой - идиот (круглое лицо)
+        let idiot = {
+            x: 400, y: 250,
+            radius: 28,
+            targetX: 400, targetY: 250,
+            speed: 380   // пикселей в секунду
+        };
+        
+        let lastTimestamp = 0;
+        let lastFrameTime = 0;
+        
+        // Сообщения
+        let currentMessage = "👇 ЖМИ НА ИДИОТА! Собирай гениальные глупости...";
+        let messageTimer = 0;
+        
+        // Визуальный эффект "пьяного/idiot" движения камеры нет, но добавим покачивание рожицы
+        
+        // ---------- ГЕНЕРАЦИЯ ПРЕДМЕТОВ (идиотских артефактов) ----------
+        const ITEM_TYPES = [
+            { name: "🧠 МЫСЛЬ: 'Съесть кактус'", effectStupidity: +5, effectHeadache: +8, effectFame: +10, color: "#b87333", emoji: "🌵" },
+            { name: "📱 СЕЛФИ С УТКОЙ", effectStupidity: +12, effectHeadache: +3, effectFame: +25, color: "#f4c542", emoji: "📸" },
+            { name: "💡 ЛАМПОЧКА (не вкручена)", effectStupidity: +2, effectHeadache: +15, effectFame: +5, color: "#eedd88", emoji: "💡" },
+            { name: "🎤 КАРАОКЕ 'В ЛЕСУ РОДИЛАСЬ'", effectStupidity: +18, effectHeadache: +10, effectFame: +35, color: "#c97e5a", emoji: "🎤" },
+            { name: "🧦 НОСКИ В ТОСТЕР", effectStupidity: +8, effectHeadache: +20, effectFame: +15, color: "#9c7c5b", emoji: "🧦" },
+            { name: "🤡 КЛОУН БЕЗ ГРИМА", effectStupidity: +25, effectHeadache: +5, effectFame: +45, color: "#ff66aa", emoji: "🤡" },
+            { name: "🚽 ВОДА ИЗ УНИТАЗА", effectStupidity: +30, effectHeadache: +25, effectFame: +20, color: "#5dade2", emoji: "🚽" },
+            { name: "📖 ИНСТРУКЦИЯ К ПАНТОГРАФУ", effectStupidity: +4, effectHeadache: +35, effectFame: +8, color: "#ddcc77", emoji: "📖" },
+            { name: "🍕 АНАНАС НА ПИЦЦЕ", effectStupidity: +15, effectHeadache: +2, effectFame: +30, color: "#f0a34b", emoji: "🍍" },
+            { name: "🐱 КОТ В ШЛЯПЕ", effectStupidity: +1, effectHeadache: +1, effectFame: +60, color: "#ff9966", emoji: "🐱" }
+        ];
+        
+        function randomItem(x,y) {
+            const type = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
+            return {
+                x: x, y: y,
+                radius: 18,
+                type: type,
+                name: type.name,
+                effectStupidity: type.effectStupidity,
+                effectHeadache: type.effectHeadache,
+                effectFame: type.effectFame,
+                color: type.color,
+                emoji: type.emoji
+            };
+        }
+        
+        function generateItems(count) {
+            let newItems = [];
+            for(let i=0; i<count; i++) {
+                let overlap = true;
+                let attempts = 0;
+                let rx, ry;
+                while(overlap && attempts < 200) {
+                    rx = 50 + Math.random() * (canvas.width - 100);
+                    ry = 50 + Math.random() * (canvas.height - 100);
+                    overlap = false;
+                    // Не спавнить прямо на идиоте
+                    const dx = rx - idiot.x;
+                    const dy = ry - idiot.y;
+                    if(Math.hypot(dx, dy) < idiot.radius + 25) overlap = true;
+                    for(let it of newItems) {
+                        if(Math.hypot(it.x - rx, it.y - ry) < 40) overlap = true;
+                    }
+                    attempts++;
+                }
+                newItems.push(randomItem(rx, ry));
+            }
+            return newItems;
+        }
+        
+        // Обновление статистики на UI
+        function updateUI() {
+            document.getElementById('stupidityValue').innerText = Math.floor(stupidity);
+            document.getElementById('painValue').innerText = Math.floor(headache);
+            document.getElementById('fameValue').innerText = Math.floor(fame);
+        }
+        
+        function showMessage(msg, isError = false) {
+            currentMessage = msg;
+            messageTimer = 2.5; // секунды
+            const msgBox = document.getElementById('messageBox');
+            msgBox.style.color = isError ? "#ffaa88" : "#ffe2a4";
+            msgBox.style.fontWeight = isError ? "bold" : "normal";
+        }
+        
+        // Проверка границ игры (проигрыш/победа)
+        function checkGameConditions() {
+            if(!gameRunning) return;
+            if(stupidity <= 0) {
+                gameRunning = false;
+                gameWin = false;
+                showMessage("💀 ИДИОТ СТАЛ СЛИШКОМ УМНЫМ... Мир отверг его! ПРОИГРЫШ 💀", true);
+                return;
+            }
+            if(headache >= 100) {
+                gameRunning = false;
+                gameWin = false;
+                showMessage("🤯 ГОЛОВА ВЗОРВАЛАСЬ ОТ ПАРАДОКСОВ! Идиот распался на атомы 🤯", true);
+                return;
+            }
+            if(fame >= 500) {
+                gameRunning = false;
+                gameWin = true;
+                showMessage("🏆 ВЕЛИКИЙ ИДИОТ! Тебя признали королём глупости! ПОБЕДА! 🏆", false);
+                return;
+            }
+            // Дополнительная весёлость: если глупость > 200, идиот становится легендой? но оставим победу только по славе
+            if(stupidity >= 250 && fame < 500) {
+                // не проигрыш, просто предупреждение
+                if(Math.random() < 0.02) showMessage("⚠️ Ты настолько туп, что это начинает нравиться богам... Но осторожнее! ⚠️");
+            }
+        }
+        
+        // Применить эффект предмета
+        function applyItemEffect(item) {
+            stupidity += item.effectStupidity;
+            headache += item.effectHeadache;
+            fame += item.effectFame;
+            
+            // ограничим для наглядности, но даём дикий рост
+            stupidity = Math.min(stupidity, 350);
+            headache = Math.min(headache, 99.5);
+            fame = Math.min(fame, 550);
+            
+            updateUI();
+            
+            let msg = `${item.emoji} ${item.name}! +${item.effectFame} славы, +${item.effectStupidity} тупости, +${item.effectHeadache} боли.`;
+            showMessage(msg);
+            checkGameConditions();
+        }
+        
+        // Перемещение идиота к месту клика (или тапа)
+        function moveIdiotTo(targetX, targetY) {
+            if(!gameRunning) return;
+            // клик на канвасе
+            let rect = canvas.getBoundingClientRect();
+            let scaleX = canvas.width / rect.width;
+            let scaleY = canvas.height / rect.height;
+            let canvasX = (targetX - rect.left) * scaleX;
+            let canvasY = (targetY - rect.top) * scaleY;
+            
+            // ограничим, чтобы идиот не выходил за границы (с учётом радиуса)
+            let clampedX = Math.min(Math.max(canvasX, idiot.radius + 5), canvas.width - idiot.radius - 5);
+            let clampedY = Math.min(Math.max(canvasY, idiot.radius + 5), canvas.height - idiot.radius - 5);
+            idiot.targetX = clampedX;
+            idiot.targetY = clampedY;
+        }
+        
+        // Обновление позиции (deltaTime в секундах)
+        function updateMovement(deltaSec) {
+            if(!gameRunning) return;
+            let dx = idiot.targetX - idiot.x;
+            let dy = idiot.targetY - idiot.y;
+            let distance = Math.hypot(dx, dy);
+            if(distance > 1.0) {
+                let step = Math.min(idiot.speed * deltaSec, distance);
+                let angle = Math.atan2(dy, dx);
+                idiot.x += Math.cos(angle) * step;
+                idiot.y += Math.sin(angle) * step;
+            } else {
+                idiot.x = idiot.targetX;
+                idiot.y = idiot.targetY;
+            }
+            
+            // столкновение с предметами (сбор)
+            for(let i=0; i<items.length; i++) {
+                const it = items[i];
+                const distToItem = Math.hypot(idiot.x - it.x, idiot.y - it.y);
+                if(distToItem < idiot.radius + it.radius) {
+                    // собрали предмет!
+                    applyItemEffect(it);
+                    items.splice(i,1);
+                    i--; // после удаления сдвиг
+                    // генерируем новый предмет взамен собранного (чтобы мир не пустел)
+                    if(gameRunning) {
+                        let newItem = null;
+                        let safe = false;
+                        for(let attempt=0; attempt<30; attempt++) {
+                            let rx = 40 + Math.random() * (canvas.width - 80);
+                            let ry = 40 + Math.random() * (canvas.height - 80);
+                            let overlap = false;
+                            if(Math.hypot(rx - idiot.x, ry - idiot.y) < idiot.radius + 25) overlap = true;
+                            for(let other of items) {
+                                if(Math.hypot(other.x - rx, other.y - ry) < 40) overlap = true;
+                            }
+                            if(!overlap) {
+                                newItem = randomItem(rx, ry);
+                                safe = true;
+                                break;
+                            }
+                        }
+                        if(safe && newItem) items.push(newItem);
+                        else items.push(randomItem(100 + Math.random() * 600, 70 + Math.random() * 360));
+                    }
+                }
+            }
+        }
+        
+        // Адаптивный спавн: поддерживаем количество предметов от 8 до 12
+        function maintainItems() {
+            if(!gameRunning) return;
+            const desiredCount = 9;
+            if(items.length < desiredCount) {
+                let needed = desiredCount - items.length;
+                for(let i=0;i<needed;i++) {
+                    let safe=false;
+                    let rx,ry;
+                    for(let attempt=0; attempt<25; attempt++) {
+                        rx = 40 + Math.random() * (canvas.width - 80);
+                        ry = 40 + Math.random() * (canvas.height - 80);
+                        let overlap=false;
+                        if(Math.hypot(rx-idiot.x, ry-idiot.y) < idiot.radius+30) overlap=true;
+                        for(let it of items){
+                            if(Math.hypot(it.x-rx, it.y-ry)<38) overlap=true;
+                        }
+                        if(!overlap) {safe=true; break;}
+                    }
+                    if(!safe){
+                        rx = 70 + Math.random()*(canvas.width-140);
+                        ry = 70 + Math.random()*(canvas.height-140);
+                    }
+                    items.push(randomItem(rx,ry));
+                }
+            }
+            if(items.length > 14) items = items.slice(0,13);
+        }
+        
+        // ---------- ОТРИСОВКА ВСЕГО ЭТОГО БЕЗУМИЯ ----------
+        function drawBackground() {
+            // Трава и небо с идиотским градиентом
+            const grad = ctx.createLinearGradient(0,0,0,canvas.height);
+            grad.addColorStop(0, "#b0e0ff");
+            grad.addColorStop(0.7, "#c7e9b0");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            // Солнце в виде подмигивающего смайлика (штрих)
+            ctx.beginPath();
+            ctx.arc(70, 70, 40, 0, Math.PI*2);
+            ctx.fillStyle = "#FFF3B0";
+            ctx.fill();
+            ctx.fillStyle = "#f5b642";
+            ctx.font = "44px monospace";
+            ctx.fillText("😜", 48, 95);
+            // облака-дурачки
+            ctx.fillStyle = "#ffffffcc";
+            ctx.beginPath();
+            ctx.ellipse(650, 60, 45, 35, 0, 0, Math.PI*2);
+            ctx.ellipse(610, 45, 35, 30, 0, 0, Math.PI*2);
+            ctx.ellipse(690, 45, 35, 30, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#00000055";
+            ctx.font = "26px monospace";
+            ctx.fillText("💩", 660, 70);
+        }
+        
+        function drawItems() {
+            for(let it of items) {
+                // тень
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = "rgba(0,0,0,0.3)";
+                ctx.beginPath();
+                ctx.arc(it.x, it.y, it.radius-2, 0, Math.PI*2);
+                ctx.fillStyle = it.color;
+                ctx.fill();
+                ctx.fillStyle = "#2c1a0c";
+                ctx.font = `${Math.floor(it.radius+8)}px "Segoe UI Emoji"`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(it.emoji, it.x, it.y+1);
+                ctx.font = "12px monospace";
+                ctx.fillStyle = "#111";
+                ctx.shadowBlur = 2;
+                ctx.fillText(it.type.name.slice(0,12), it.x, it.y+22);
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        function drawIdiot() {
+            // Эффект дрожания для "тупизны" (чем выше stupidity, тем сильнее тряска)
+            let shakeX = 0, shakeY = 0;
+            if(stupidity > 70) {
+                shakeX = (Math.random() - 0.5) * 2.2;
+                shakeY = (Math.random() - 0.5) * 2.2;
+            }
+            const ix = idiot.x + shakeX;
+            const iy = idiot.y + shakeY;
+            
+            // голова
+            ctx.beginPath();
+            ctx.arc(ix, iy, idiot.radius, 0, Math.PI*2);
+            ctx.fillStyle = "#FDD7A4";
+            ctx.fill();
+            ctx.strokeStyle = "#946B40";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // волосы дурака
+            ctx.fillStyle = "#6B4C3B";
+            ctx.beginPath();
+            ctx.ellipse(ix-10, iy-22, 12, 18, -0.2, 0, Math.PI*2);
+            ctx.ellipse(ix+10, iy-22, 12, 18, 0.2, 0, Math.PI*2);
+            ctx.fill();
+            // глаза - ошалелые
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.arc(ix-12, iy-5, 5, 0, Math.PI*2);
+            ctx.arc(ix+12, iy-5, 5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            ctx.arc(ix-14, iy-8, 2, 0, Math.PI*2);
+            ctx.arc(ix+10, iy-8, 2, 0, Math.PI*2);
+            ctx.fill();
+            // зрачки косые
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.arc(ix-12 + (Math.sin(Date.now()*0.008)*1.2), iy-5 + (Math.cos(Date.now()*0.01)*0.8), 2.2, 0, Math.PI*2);
+            ctx.arc(ix+12 + (Math.sin(Date.now()*0.008+2)*1.2), iy-5 + (Math.cos(Date.now()*0.01)*0.8), 2.2, 0, Math.PI*2);
+            ctx.fill();
+            
+            // рот - кривая улыбка/гримаса
+            ctx.beginPath();
+            ctx.arc(ix, iy+8, 12, 0.05, Math.PI - 0.05, false);
+            ctx.strokeStyle = "#A1421A";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            // капля пота
+            if(headache > 40) {
+                ctx.fillStyle = "#7ec8e0";
+                ctx.beginPath();
+                ctx.moveTo(ix-5, iy-18);
+                ctx.quadraticCurveTo(ix-2, iy-10, ix-10, iy-12);
+                ctx.fill();
+            }
+            // надпись "ИДИОТ" на лбу
+            ctx.font = "bold 12px monospace";
+            ctx.fillStyle = "#b33e1f";
+            ctx.fillText("🤪", ix-6, iy-18);
+        }
+        
+        function drawUIonCanvas() {
+            if(!gameRunning) {
+                ctx.font = "bold 32 monospace";
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = gameWin ? "#FFD966" : "#FF8888";
+                ctx.shadowColor = "black";
+                let msg = gameWin ? "🌟 ПОБЕДА! ТЫ ГЛАВНЫЙ ИДИОТ! 🌟" : "💀 КОНЕЦ ИСТОРИИ ДУРАКА 💀";
+                ctx.fillText(msg, canvas.width/2 - 180, canvas.height/2);
+                ctx.font = "18px monospace";
+                ctx.fillStyle = "#EEEEAA";
+                ctx.fillText("Нажми 'НАЧАТЬ ЗАНОВО'", canvas.width/2-130, canvas.height/2+60);
+            }
+        }
+        
+        // Таймер сообщения
+        function updateMessageTimer(deltaSec) {
+            if(messageTimer > 0) {
+                messageTimer -= deltaSec;
+                if(messageTimer <= 0) {
+                    document.getElementById('messageBox').style.color = "#ffe2a4";
+                    if(gameRunning) currentMessage = "🤪 Идиот бродит... жми на него, чтобы собирать глупости!";
+                    else if(gameWin) currentMessage = "🏆 Ты легендарный идиот! Перезапусти игру 🏆";
+                    else currentMessage = "😵 Идиот пал жертвой собственного разума... нажми рестарт";
+                    document.getElementById('messageBox').innerText = currentMessage;
+                } else {
+                    document.getElementById('messageBox').innerText = currentMessage;
+                }
+            } else {
+                document.getElementById('messageBox').innerText = currentMessage;
+            }
+        }
+        
+        // Основной цикл
+        let lastUpdateTime = performance.now() / 1000;
+        function gameLoop(nowMs) {
+            const nowSec = nowMs / 1000;
+            let delta = Math.min(0.033, nowSec - lastUpdateTime);
+            if(delta <= 0) {
+                requestAnimationFrame(gameLoop);
+                lastUpdateTime = nowSec;
+                return;
+            }
+            lastUpdateTime = nowSec;
+            
+            if(gameRunning) {
+                updateMovement(delta);
+                maintainItems();
+                checkGameConditions();
+            }
+            updateMessageTimer(delta);
+            
+            // отрисовка
+            drawBackground();
+            drawItems();
+            drawIdiot();
+            drawUIonCanvas();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Рестарт игры
+        function restartGame() {
+            stupidity = 100;
+            headache = 0;
+            fame = 0;
+            gameRunning = true;
+            gameWin = false;
+            idiot.x = 400; idiot.y = 250;
+            idiot.targetX = 400; idiot.targetY = 250;
+            items = [];
+            items.push(...generateItems(8));
+            updateUI();
+            showMessage("НОВАЯ ЖИЗНЬ ИДИОТА! Жми на него и собирай ценный бред!", false);
+            checkGameConditions();
+        }
+        
+        // Инициализация событий
+        function init() {
+            restartGame(); // начальное состояние
+            canvas.addEventListener('click', (e) => {
+                if(!gameRunning) return;
+                moveIdiotTo(e.clientX, e.clientY);
+            });
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if(!gameRunning) return;
+                const touch = e.touches[0];
+                moveIdiotTo(touch.clientX, touch.clientY);
+            });
+            document.getElementById('resetGame').addEventListener('click', () => {
+                restartGame();
+            });
+            updateUI();
+            lastUpdateTime = performance.now() / 1000;
+            requestAnimationFrame(gameLoop);
+        }
+        
+        init();
+    })();
+</script>
+</body>
+</html>
