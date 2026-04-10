@@ -75,6 +75,32 @@
             color: #cbd5e1;
         }
 
+        /* Стили для переключателя сервисов */
+        .services {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .service-btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 40px;
+            padding: 0.6rem 1.2rem;
+            color: #e2e8f0;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .service-btn:hover {
+            border-color: #00ff88;
+            color: #00ff88;
+            transform: translateY(-2px);
+        }
+
         .features {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -238,9 +264,16 @@
             <div class="tagline">Никто никогда не узнает, что ты здесь делал</div>
         </div>
 
+        <!-- Переключатель сервисов -->
+        <div class="services">
+            <a href="search.html" class="service-btn">🔍 CDFG Search</a>
+            <a href="se.html" class="service-btn">✏️ CDFG SE</a>
+            <a href="cdfggames.html" class="service-btn">🎮 CDFG Games</a>
+        </div>
+
         <div class="hero">
             <h1>Браузер, который не оставляет следов</h1>
-            <p>Ни истории. Ни кэша. Ни куки. Ни доказательств. Только ты и интернет.</p>
+            <p>Ни истории. Ни доказательств. Только ты и интернет.</p>
         </div>
 
         <div class="features">
@@ -252,7 +285,7 @@
             <div class="card">
                 <div class="card-icon">🗑️</div>
                 <h3>Полная очистка</h3>
-                <p><strong>Кэш и куки полностью удаляются</strong> при перезагрузке. Никаких следов.</p>
+                <p>Все данные удаляются при перезагрузке. Никаких следов.</p>
             </div>
             <div class="card">
                 <div class="card-icon">👀</div>
@@ -276,7 +309,7 @@
                 <div class="warning">
                     ⚠️ <strong>ВАЖНО:</strong> Кнопка «Назад» внутри браузера (навигация по страницам) НЕ СПАСЁТ — ты попадёшь на предыдущий сайт, где мама увидит, что ты искал!
                 </div>
-                <p style="margin-top: 0.8rem;">✅ <strong>Системная кнопка «Назад» перезагружает приложение и открывает стартовую страницу.</strong> Всё исчезает: история, кэш, куки, введённые запросы.</p>
+                <p style="margin-top: 0.8rem;">✅ <strong>Системная кнопка «Назад» перезагружает приложение и открывает стартовую страницу.</strong> Всё исчезает: история, введённые запросы, все следы.</p>
             </div>
         </div>
 
@@ -293,7 +326,7 @@
                 </div>
                 <div class="step">
                     <div class="step-number">3</div>
-                    <p>Приложение перезагружается — кэш, куки, история — всё удаляется</p>
+                    <p>Приложение перезагружается — все данные удаляются</p>
                 </div>
                 <div class="step">
                     <div class="step-number">4</div>
@@ -304,15 +337,23 @@
 
         <div class="download">
             <h2>📥 Скачать CDFG Browser</h2>
-            <p>Полная приватность. Авто-очистка кэша и куки. Абсолютное инкогнито.</p>
+            <p>Полная приватность. Абсолютное инкогнито.</p>
             <a href="CDFG.apk" class="btn" id="downloadBtn">⬇️ Скачать APK</a>
         </div>
 
         <div class="footer">
             <p>CDFG Browser — Инкогнито браузер</p>
-            <p>✅ Нет истории | ✅ Очистка кэша | ✅ Очистка куки | ✅ Системная кнопка «Назад» = перезагрузка</p>
+            <p>✅ Нет истории | ✅ Очистка данных | ✅ Системная кнопка «Назад» = перезагрузка</p>
             <p style="margin-top: 0.8rem;">© 2026 CDFG | Твои дела — только твои</p>
         </div>
     </div>
+
+    <script>
+        document.getElementById('downloadBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('Скачивание CDFG Browser APK начнется сейчас');
+            window.location.href = 'CDFG.apk';
+        });
+    </script>
 </body>
-  </html>
+                </html>
