@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Maze — CDFG Games</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, monospace;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: #0f0;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 10;
+            pointer-events: none;
+            font-family: monospace;
+            backdrop-filter: blur(4px);
+            border-left: 3px solid #0f0;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            color: #ccc;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 10;
+            font-family: monospace;
+            pointer-events: none;
+        }
+        #winMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            color: #ffaa00;
+            font-size: 32px;
+            font-weight: bold;
+            padding: 20px 40px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 20;
+            display: none;
+            font-family: monospace;
+            backdrop-filter: blur(8px);
+            border: 2px solid gold;
+            white-space: nowrap;
+        }
+        @media (max-width: 600px) {
+            #info { font-size: 10px; top: 10px; left: 10px; }
+            #controls { font-size: 8px; }
+            #winMessage { font-size: 20px; padding: 12px 24px; white-space: normal; width: 80%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        🧭 3D MAZE | 🔍 Найди ЗОЛОТОЙ ВЫХОД | ✨ Собери все кристаллы
+    </div>
+    <div id="controls">
+        🎮 WASD / стрелки — движение | 🖱️ Мышь / палец — поворот камеры
+    </div>
+    <div id="winMessage">
+        🎉 ВЫХОД НАЙДЕН! 🎉<br>
+        ✨ Ты победил лабиринт ✨
+    </div>
+
+    <!-- Подключаем Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // ---------- НАСТРОЙКИ ----------
+        const mazeSize = 11;      // нечётное, чтобы старт и финиш были по краям
+        const cellSize = 2.5;
+        const wallHeight = 2.5;
+        const playerSpeed = 5.0;
+        const mouseSensitivity = 0.002;
+        
+        // Генерация лабиринта (рекурсивный бэктрекинг)
+        function generateMaze(size) {
+            // размер должен быть нечётным
+            let maze = Array(size).fill().map(() => Array(size).fill(1));
+            // проходим по всем нечётным координатам
+            function carve(x, z) {
+                const dirs = [[0, -2], [2, 0], [0, 2], [-2, 0]];
+                for (let i = dirs.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+                }
+                for (let [dx, dz] of dirs) {
+                    const nx = x + dx;
+                    const nz = z + dz;
+                    if (nx > 0 && nx < size-1 && nz > 0 && nz < size-1 && maze[nz][nx] === 1) {
+                        maze[nz][nx] = 0;
+                        maze[z + dz/2][x + dx/2] = 0;
+                        carve(nx, nz);
+                    }
+                }
+            }
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    maze[i][j] = 1;
+                }
+            }
+            maze[1][1] = 0;
+            carve(1, 1);
+            // Выход - правый нижний угол
+            maze[size-2][size-2] = 2; // 2 = выход
+            // Добавим несколько кристаллов (бонусов)
+            let bonuses = [];
+            for (let i=0; i<12; i++) {
+                let x, z;
+                do {
+                    x = 1 + Math.floor(Math.random() * (size-2));
+                    z = 1 + Math.floor(Math.random() * (size-2));
+                } while ( (x===1 && z===1) || (x===size-2 && z===size-2) || maze[z][x] !== 0);
+                bonuses.push({x, z, collected: false});
+            }
+            return {maze, bonuses, exitX: size-2, exitZ: size-2};
+        }
+        
+        const {maze, bonuses, exitX, exitZ} = generateMaze(mazeSize);
+        
+        // ---------- THREE.JS СЦЕНА ----------
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050b1a);
+        scene.fog = new THREE.FogExp2(0x050b1a, 0.008);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.y = 1.6;
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+        
+        // ----- ОСВЕЩЕНИЕ -----
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 20, 5);
+        dirLight.castShadow = true;
+        dirLight.receiveShadow = true;
+        scene.add(dirLight);
+        const fillLight = new THREE.PointLight(0x4466cc, 0.3);
+        fillLight.position.set(0, 5, 0);
+        scene.add(fillLight);
+        
+        // Пол
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.6, metalness: 0.1 });
+        const floorPlane = new THREE.Mesh(new THREE.PlaneGeometry(mazeSize*cellSize, mazeSize*cellSize), floorMat);
+        floorPlane.rotation.x = -Math.PI/2;
+        floorPlane.position.y = -0.05;
+        floorPlane.receiveShadow = true;
+        scene.add(floorPlane);
+        
+        // Стены
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.3, metalness: 0.05 });
+        const topMat = new THREE.MeshStandardMaterial({ color: 0xbc8f6b });
+        
+        function addWall(x, z, rx, rz, lenX, lenZ) {
+            const wallGeo = new THREE.BoxGeometry(lenX, wallHeight, lenZ);
+            const wall = new THREE.Mesh(wallGeo, wallMat);
+            wall.position.set(x, wallHeight/2, z);
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            scene.add(wall);
+            // верхушка
+            const capGeo = new THREE.BoxGeometry(lenX+0.05, 0.1, lenZ+0.05);
+            const cap = new THREE.Mesh(capGeo, topMat);
+            cap.position.set(x, wallHeight-0.05, z);
+            cap.castShadow = true;
+            scene.add(cap);
+        }
+        
+        for (let i=0; i<mazeSize; i++) {
+            for (let j=0; j<mazeSize; j++) {
+                if (maze[i][j] === 1) {
+                    const worldX = (j - mazeSize/2) * cellSize;
+                    const worldZ = (i - mazeSize/2) * cellSize;
+                    addWall(worldX, worldZ, 0,0, cellSize, cellSize);
+                }
+            }
+        }
+        
+        // Выход (золотая арка)
+        const exitWorldX = (exitX - mazeSize/2) * cellSize;
+        const exitWorldZ = (exitZ - mazeSize/2) * cellSize;
+        const archMat = new THREE.MeshStandardMaterial({ color: 0xffaa33, emissive: 0x442200 });
+        const exitPillarL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, 0.4), archMat);
+        exitPillarL.position.set(exitWorldX - 0.8, 1.1, exitWorldZ);
+        exitPillarL.castShadow = true;
+        const exitPillarR = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, 0.4), archMat);
+        exitPillarR.position.set(exitWorldX + 0.8, 1.1, exitWorldZ);
+        exitPillarR.castShadow = true;
+        const exitBeam = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.3, 0.4), archMat);
+        exitBeam.position.set(exitWorldX, 2.0, exitWorldZ);
+        exitBeam.castShadow = true;
+        scene.add(exitPillarL, exitPillarR, exitBeam);
+        
+        // Бонусы - кристаллы
+        const bonusGroup = [];
+        const gemMat = new THREE.MeshStandardMaterial({ color: 0x33ccff, emissive: 0x0066aa });
+        bonuses.forEach(b => {
+            if (!b.collected) {
+                const worldX = (b.x - mazeSize/2) * cellSize;
+                const worldZ = (b.z - mazeSize/2) * cellSize;
+                const gem = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.5, 8), gemMat);
+                gem.position.set(worldX, 0.3, worldZ);
+                gem.castShadow = true;
+                scene.add(gem);
+                bonusGroup.push({gem, bonus: b, worldX, worldZ});
+            }
+        });
+        
+        // Стартовая позиция игрока
+        let playerX = (1 - mazeSize/2) * cellSize;
+        let playerZ = (1 - mazeSize/2) * cellSize;
+        let playerAngle = 0; // угол поворота в радианах
+        camera.position.x = playerX;
+        camera.position.z = playerZ;
+        camera.position.y = 1.6;
+        camera.rotation.order = 'YXZ';
+        
+        let yaw = -Math.PI/4;
+        let pitch = 0;
+        
+        // Управление
+        const keyState = { w: false, s: false, a: false, d: false };
+        let mouseX = 0, mouseY = 0;
+        let firstMouse = true;
+        
+        function updateMovement(deltaTime) {
+            let move = new THREE.Vector3(0,0,0);
+            const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+            const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+            if (keyState.w) move.add(forward);
+            if (keyState.s) move.sub(forward);
+            if (keyState.d) move.add(right);
+            if (keyState.a) move.sub(right);
+            move.normalize();
+            let newX = playerX + move.x * playerSpeed * deltaTime;
+            let newZ = playerZ + move.z * playerSpeed * deltaTime;
+            
+            // Коллизия со стенами (клетки)
+            const checkCollision = (nx, nz) => {
+                const gridX = Math.round(nx / cellSize + mazeSize/2);
+                const gridZ = Math.round(nz / cellSize + mazeSize/2);
+                if (gridX < 0 || gridX >= mazeSize || gridZ < 0 || gridZ >= mazeSize) return true;
+                if (maze[gridZ][gridX] === 1) return true;
+                return false;
+            };
+            
+            if (!checkCollision(newX, playerZ)) playerX = newX;
+            if (!checkCollision(playerX, newZ)) playerZ = newZ;
+            
+            camera.position.x = playerX;
+            camera.position.z = playerZ;
+            
+            // Сбор бонусов
+            for (let i=0; i<bonusGroup.length; i++) {
+                const item = bonusGroup[i];
+                if (!item.bonus.collected) {
+                    const dist = Math.hypot(playerX - item.worldX, playerZ - item.worldZ);
+                    if (dist < 1.0) {
+                        item.bonus.collected = true;
+                        scene.remove(item.gem);
+                        bonusGroup.splice(i,1);
+                        i--;
+                        const infoDiv = document.getElementById('info');
+                        infoDiv.innerHTML = `🧭 3D MAZE | ✨ Кристалл собран! Осталось: ${bonusGroup.length}`;
+                        setTimeout(() => {
+                            if (bonusGroup.length === 0) infoDiv.innerHTML = `🧭 3D MAZE | 🔓 Выход открыт! Иди к золотой арке!`;
+                            else infoDiv.innerHTML = `🧭 3D MAZE | ✨ Осталось кристаллов: ${bonusGroup.length}`;
+                        }, 100);
+                    }
+                }
+            }
+            
+            // Проверка выхода (только если все бонусы собраны)
+            const exitDist = Math.hypot(playerX - exitWorldX, playerZ - exitWorldZ);
+            if (bonusGroup.length === 0 && exitDist < 1.2) {
+                document.getElementById('winMessage').style.display = 'block';
+                setTimeout(() => {
+                    // перезапуск через 3 секунды (опционально)
+                    window.location.reload();
+                }, 3000);
+            }
+        }
+        
+        // Обработка ввода
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w') keyState.w = true;
+            if (k === 's') keyState.s = true;
+            if (k === 'a') keyState.a = true;
+            if (k === 'd') keyState.d = true;
+            if (k === 'arrowup') keyState.w = true;
+            if (k === 'arrowdown') keyState.s = true;
+            if (k === 'arrowleft') keyState.a = true;
+            if (k === 'arrowright') keyState.d = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w') keyState.w = false;
+            if (k === 's') keyState.s = false;
+            if (k === 'a') keyState.a = false;
+            if (k === 'd') keyState.d = false;
+            if (k === 'arrowup') keyState.w = false;
+            if (k === 'arrowdown') keyState.s = false;
+            if (k === 'arrowleft') keyState.a = false;
+            if (k === 'arrowright') keyState.d = false;
+        });
+        
+        // Мышь / сенсорное управление
+        renderer.domElement.addEventListener('mousemove', (e) => {
+            if (firstMouse) {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                firstMouse = false;
+            }
+            const dx = e.clientX - mouseX;
+            const dy = e.clientY - mouseY;
+            yaw -= dx * mouseSensitivity;
+            pitch -= dy * mouseSensitivity;
+            pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch));
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+        
+        renderer.domElement.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (e.touches.length) {
+                const dx = e.touches[0].clientX - mouseX;
+                const dy = e.touches[0].clientY - mouseY;
+                yaw -= dx * 0.005;
+                pitch -= dy * 0.005;
+                pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch));
+                mouseX = e.touches[0].clientX;
+                mouseY = e.touches[0].clientY;
+            }
+        });
+        
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            if (e.touches.length) {
+                mouseX = e.touches[0].clientX;
+                mouseY = e.touches[0].clientY;
+                firstMouse = false;
+            }
+        });
+        
+        // Анимация
+        let lastTime = performance.now() / 1000;
+        function animate() {
+            const now = performance.now() / 1000;
+            let delta = Math.min(0.033, now - lastTime);
+            if (delta > 0) updateMovement(delta);
+            lastTime = now;
+            
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        animate();
+        
+        // Начальная подсказка
+        setTimeout(() => {
+            const infoDiv = document.getElementById('info');
+            infoDiv.innerHTML = `🧭 3D MAZE | ✨ Собери все ${bonusGroup.length} кристаллов, чтобы открыть выход!`;
+        }, 500);
+    </script>
+</body>
+  </html>
