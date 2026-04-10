@@ -75,7 +75,7 @@
 
         .games-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 1.5rem;
             margin-top: 2rem;
         }
@@ -162,6 +162,112 @@
             color: #64748b;
         }
 
+        /* Страница игры */
+        .game-page {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 32px;
+            padding: 2rem;
+            margin-top: 2rem;
+        }
+
+        .game-page-header {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .game-page-icon {
+            width: 200px;
+            height: 200px;
+            background: #1e293b;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .game-page-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .game-page-icon .no-icon {
+            font-size: 4rem;
+        }
+
+        .game-page-info {
+            flex: 1;
+        }
+
+        .game-page-title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            color: #00ff88;
+        }
+
+        .game-page-author {
+            font-size: 1rem;
+            color: #94a3b8;
+            margin-bottom: 1rem;
+        }
+
+        .game-page-description {
+            font-size: 1rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .game-page-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .game-page-meta-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .game-page-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, #00ff88, #ff00aa);
+            border: none;
+            border-radius: 60px;
+            padding: 0.8rem 2rem;
+            color: #0a0a0a;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .back-btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #00ff88;
+            border-radius: 40px;
+            padding: 0.5rem 1.2rem;
+            color: #00ff88;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
         .info {
             text-align: center;
             padding: 1rem;
@@ -173,6 +279,9 @@
         @media (max-width: 600px) {
             .container { padding: 1rem; }
             .games-grid { grid-template-columns: 1fr; }
+            .game-page-header { flex-direction: column; align-items: center; text-align: center; }
+            .game-page-icon { width: 150px; height: 150px; }
+            .game-page-title { font-size: 1.5rem; }
         }
     </style>
 </head>
@@ -181,25 +290,34 @@
         <div class="header">
             <div class="logo">CDFG GAMES</div>
             <div class="tagline">🎮 бесплатные игры, без слежки</div>
-            <button onclick="location.href='index.html'" style="background: rgba(30,41,59,0.8); border: 1px solid #00ff88; color: #00ff88; padding: 0.5rem 1rem; border-radius: 40px; cursor: pointer;">🏠 CDFG Browser</button>
         </div>
 
-        <div class="search-container">
-            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Поиск игр..." autocomplete="off">
+        <div id="mainView">
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-box" placeholder="🔍 Поиск игр..." autocomplete="off">
+            </div>
+            <div class="games-grid" id="gamesGrid">
+                <div class="loading">🎮 Загрузка игр...</div>
+            </div>
         </div>
 
-        <div class="games-grid" id="gamesGrid">
-            <div class="loading">🎮 Загрузка игр...</div>
+        <div id="gamePageView" style="display: none;">
+            <button class="back-btn" id="backToGridBtn">← Назад к играм</button>
+            <div class="game-page" id="gamePageContent"></div>
         </div>
 
         <div class="info">
-            🎮 Нажми на игру, чтобы начать
+            🎮 Нажми на игру, чтобы узнать подробности
         </div>
     </div>
 
     <script>
         const searchInput = document.getElementById('searchInput');
         const gamesGrid = document.getElementById('gamesGrid');
+        const mainView = document.getElementById('mainView');
+        const gamePageView = document.getElementById('gamePageView');
+        const gamePageContent = document.getElementById('gamePageContent');
+        const backToGridBtn = document.getElementById('backToGridBtn');
         
         let allGames = [];
 
@@ -269,7 +387,6 @@
                     ? `<img src="games/${game.folder}/${game.icon}" alt="${game.title}" onerror="this.parentElement.innerHTML='<div class=\'no-icon\'>🎮</div>'">`
                     : `<div class="no-icon">🎮</div>`;
                 
-                // Звёздочки для рейтинга
                 let stars = '';
                 const rating = parseFloat(game.rating);
                 if (!isNaN(rating)) {
@@ -291,15 +408,6 @@
                             <span>🎮 ${escapeHtml(game.genre)}</span>
                             <span>⭐ ${stars}</span>
                         </div>
-                        <div class="game-meta">
-                            <span>👤 ${escapeHtml(game.author)}</span>
-                            <span>🎮 ${escapeHtml(game.controls)}</span>
-                        </div>
-                        ${game.tags && game.tags.length ? `
-                            <div class="game-tags">
-                                ${game.tags.map(tag => `<span class="tag">#${escapeHtml(tag)}</span>`).join('')}
-                            </div>
-                        ` : ''}
                     </div>
                 `;
             }
@@ -309,11 +417,77 @@
             document.querySelectorAll('.game-card').forEach(card => {
                 card.addEventListener('click', () => {
                     const index = parseInt(card.dataset.index);
-                    const game = allGames[index];
-                    window.location.href = `game-wrapper.html?game=${encodeURIComponent(game.folder)}&title=${encodeURIComponent(game.title)}`;
+                    showGamePage(allGames[index]);
                 });
             });
         }
+
+        function showGamePage(game) {
+            // Звёзды
+            let stars = '';
+            const rating = parseFloat(game.rating);
+            if (!isNaN(rating)) {
+                const fullStars = Math.floor(rating);
+                for (let s = 0; s < fullStars; s++) stars += '⭐';
+                if (rating - fullStars >= 0.5) stars += '½';
+            } else {
+                stars = game.rating;
+            }
+            
+            const iconHtml = game.icon 
+                ? `<img src="games/${game.folder}/${game.icon}" alt="${game.title}" onerror="this.parentElement.innerHTML='<div class=\'no-icon\'>🎮</div>'">`
+                : `<div class="no-icon">🎮</div>`;
+            
+            const tagsHtml = game.tags && game.tags.length 
+                ? game.tags.map(tag => `<span class="tag">#${escapeHtml(tag)}</span>`).join('')
+                : '';
+            
+            gamePageContent.innerHTML = `
+                <div class="game-page-header">
+                    <div class="game-page-icon">
+                        ${iconHtml}
+                    </div>
+                    <div class="game-page-info">
+                        <div class="game-page-title">${escapeHtml(game.title)}</div>
+                        <div class="game-page-author">👤 ${escapeHtml(game.author)}</div>
+                        <div class="game-page-description">${escapeHtml(game.description)}</div>
+                        <div class="game-page-meta">
+                            <div class="game-page-meta-item">🎮 ${escapeHtml(game.genre)}</div>
+                            <div class="game-page-meta-item">⭐ ${stars}</div>
+                            <div class="game-page-meta-item">🎮 Управление: ${escapeHtml(game.controls)}</div>
+                        </div>
+                        <div class="game-page-tags">
+                            ${tagsHtml}
+                        </div>
+                        <button class="play-btn" id="playGameBtn">🎮 Играть</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('playGameBtn').addEventListener('click', () => {
+                window.location.href = `game-wrapper.html?game=${encodeURIComponent(game.folder)}&title=${encodeURIComponent(game.title)}`;
+            });
+            
+            mainView.style.display = 'none';
+            gamePageView.style.display = 'block';
+            window.scrollTo(0, 0);
+        }
+
+        backToGridBtn.addEventListener('click', () => {
+            mainView.style.display = 'block';
+            gamePageView.style.display = 'none';
+            // Обновляем поиск если нужно
+            if (searchInput.value.trim() !== '') {
+                const query = searchInput.value.toLowerCase().trim();
+                const filtered = allGames.filter(game => 
+                    game.title.toLowerCase().includes(query) ||
+                    (game.description && game.description.toLowerCase().includes(query)) ||
+                    (game.tags && game.tags.some(tag => tag.toLowerCase().includes(query))) ||
+                    (game.genre && game.genre.toLowerCase().includes(query))
+                );
+                displayGames(filtered);
+            }
+        });
         
         function escapeHtml(text) {
             if (!text) return '';
@@ -341,4 +515,4 @@
         loadGames();
     </script>
 </body>
-    </html>
+</html>
