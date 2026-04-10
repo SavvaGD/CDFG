@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>CDFG Search — приватный поиск</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .header {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00ff88, #00b4d8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 2px;
+        }
+
+        .tagline {
+            font-size: 0.8rem;
+            color: #00ff88;
+            margin-top: 0.3rem;
+        }
+
+        .search-container {
+            margin: 2rem 0 1rem;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 60px;
+            padding: 0.3rem;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .search-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 0.8rem 1.2rem;
+            color: #e2e8f0;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .search-box input::placeholder {
+            color: #64748b;
+        }
+
+        .search-box button {
+            background: linear-gradient(135deg, #00ff88, #00b4d8);
+            border: none;
+            border-radius: 60px;
+            padding: 0.8rem 1.5rem;
+            color: #0a0a0a;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .search-box button:hover {
+            transform: scale(1.02);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #00ff88;
+        }
+
+        .results {
+            margin-top: 2rem;
+        }
+
+        .result-item {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 16px;
+            padding: 1rem;
+            margin-bottom: 0.8rem;
+            transition: all 0.2s;
+            border-left: 3px solid #00ff88;
+        }
+
+        .result-item:hover {
+            background: rgba(30, 41, 59, 0.8);
+        }
+
+        .result-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .result-title a {
+            color: #00ff88;
+            text-decoration: none;
+        }
+
+        .result-title a:hover {
+            text-decoration: underline;
+        }
+
+        .result-url {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-bottom: 0.3rem;
+            word-break: break-all;
+        }
+
+        .result-snippet {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+
+        .error {
+            text-align: center;
+            padding: 3rem;
+            color: #ef4444;
+        }
+
+        .info {
+            text-align: center;
+            padding: 1rem;
+            font-size: 0.7rem;
+            color: #475569;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 600px) {
+            .container { padding: 1rem; }
+            .search-box button { padding: 0.8rem 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">CDFG SEARCH</div>
+            <div class="tagline">🔒 приватный поиск без слежки и истории</div>
+        </div>
+
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Что ищем?.." autocomplete="off">
+                <button id="searchBtn">🔍 Найти</button>
+            </div>
+        </div>
+
+        <div class="results" id="resultsContainer">
+            <div class="no-results">Введите запрос и нажмите «Найти»</div>
+        </div>
+
+        <div class="info">
+            🔒 Анонимный поиск | Без истории | Без слежки | Работает через DuckDuckGo
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const resultsContainer = document.getElementById('resultsContainer');
+
+        // Никакого сохранения истории — даже в localStorage не пишем
+
+        async function search() {
+            const query = searchInput.value.trim();
+            
+            if (query === "") {
+                resultsContainer.innerHTML = '<div class="no-results">Введите запрос</div>';
+                return;
+            }
+
+            // Показываем загрузку
+            resultsContainer.innerHTML = '<div class="loading">🔍 Ищем...</div>';
+
+            try {
+                // Используем DuckDuckGo API (бесплатно, без ключа)
+                // CORS-прокси для обхода ограничений браузера
+                const proxyUrl = 'https://api.allorigins.win/get?url=';
+                const apiUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&pretty=1&no_html=1&skip_disambig=1`;
+                
+                const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
+                const data = await response.json();
+                const jsonData = JSON.parse(data.contents);
+                
+                displayResults(jsonData, query);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                // Если API не работает, показываем заглушку
+                resultsContainer.innerHTML = `
+                    <div class="error">
+                        ⚠️ Ошибка загрузки результатов<br>
+                        <small>Попробуйте позже или поищите в Google</small>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-title"><a href="https://www.google.com/search?q=${encodeURIComponent(query)}" target="_blank">🔍 Поискать в Google →</a></div>
+                        <div class="result-snippet">Результаты поиска по запросу «${query}»</div>
+                    </div>
+                `;
+            }
+        }
+
+        function displayResults(data, query) {
+            const results = [];
+            
+            // Основной результат (если есть)
+            if (data.AbstractText) {
+                results.push({
+                    title: data.AbstractSource || 'Результат',
+                    url: data.AbstractURL || '#',
+                    snippet: data.AbstractText
+                });
+            }
+            
+            // Связанные темы
+            if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+                for (let topic of data.RelatedTopics) {
+                    if (typeof topic === 'object' && topic.Text) {
+                        let title = topic.Text.split(' - ')[0] || 'Результат';
+                        let snippet = topic.Text;
+                        let url = topic.FirstURL || '#';
+                        
+                        results.push({
+                            title: title,
+                            url: url,
+                            snippet: snippet.length > 200 ? snippet.substring(0, 200) + '...' : snippet
+                        });
+                    }
+                    if (results.length >= 15) break;
+                }
+            }
+            
+            // Если результатов нет
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        😕 Ничего не найдено по запросу «${query}»<br><br>
+                        <div class="result-item">
+                            <div class="result-title"><a href="https://www.google.com/search?q=${encodeURIComponent(query)}" target="_blank">🔍 Поискать в Google →</a></div>
+                            <div class="result-snippet">Результаты поиска по запросу «${query}»</div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Отображаем результаты
+            let html = '';
+            for (let res of results) {
+                html += `
+                    <div class="result-item">
+                        <div class="result-title"><a href="${res.url}" target="_blank">${escapeHtml(res.title)}</a></div>
+                        <div class="result-url">${escapeHtml(res.url)}</div>
+                        <div class="result-snippet">${escapeHtml(res.snippet)}</div>
+                    </div>
+                `;
+            }
+            
+            resultsContainer.innerHTML = html;
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        searchBtn.addEventListener('click', search);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') search();
+        });
+    </script>
+</body>
+          </html>
