@@ -176,7 +176,7 @@
         </div>
 
         <div class="info">
-            🎮 Добавь папку с игрой в games/ (main.html + info.json) | Без истории | Без слежки
+            🎮 Добавь папку с игрой в games/ (main.html + info.json + icon.png) | Без истории | Без слежки
         </div>
     </div>
 
@@ -186,18 +186,10 @@
         
         let allGames = [];
 
-        // Список известных игр (можно расширять, но игры НЕ зашиты в код)
-        // Просто перебираем возможные папки, проверяем существует ли main.html
-        // ВАЖНО: нужно заранее знать список папок. Без серверного языка мы не можем "просканировать" папку.
-        // Поэтому я сделаю так: если нет манифеста, используем предопределённый список, 
-        // но ты можешь его менять без изменения кода — через внешний JSON файл.
-        
-        // Способ: загружаем список папок из внешнего games/list.json (создаёшь руками)
         async function loadGames() {
             gamesGrid.innerHTML = '<div class="loading">🎮 Загрузка игр...</div>';
             
             try {
-                // Пытаемся загрузить список папок из games/list.json
                 const listResponse = await fetch('games/list.json');
                 let gameFolders = [];
                 
@@ -205,7 +197,6 @@
                     const list = await listResponse.json();
                     gameFolders = list.games || [];
                 } else {
-                    // Если list.json нет — показываем инструкцию
                     gamesGrid.innerHTML = `
                         <div class="no-results">
                             📁 Нет игр<br>
@@ -220,22 +211,27 @@
                 
                 for (const gameFolder of gameFolders) {
                     try {
-                        // Проверяем существование main.html
                         const mainCheck = await fetch(`games/${gameFolder}/main.html`, { method: 'HEAD' });
                         if (!mainCheck.ok) continue;
                         
-                        // Загружаем info.json
                         const infoResponse = await fetch(`games/${gameFolder}/info.json`);
                         let gameInfo = {
                             title: gameFolder,
                             description: 'Описание отсутствует',
                             genre: 'Игра',
-                            rating: 'Новинка'
+                            rating: 'Новинка',
+                            icon: null
                         };
                         
                         if (infoResponse.ok) {
                             const info = await infoResponse.json();
                             gameInfo = { ...gameInfo, ...info };
+                        }
+                        
+                        // Проверяем существование иконки
+                        if (gameInfo.icon) {
+                            const iconCheck = await fetch(`games/${gameFolder}/${gameInfo.icon}`, { method: 'HEAD' });
+                            if (!iconCheck.ok) gameInfo.icon = null;
                         }
                         
                         gameInfo.folder = gameFolder;
@@ -269,7 +265,7 @@
             for (let i = 0; i < games.length; i++) {
                 const game = games[i];
                 const iconHtml = game.icon 
-                    ? `<img src="games/${game.folder}/${game.icon}" alt="${game.title}">`
+                    ? `<img src="games/${game.folder}/${game.icon}" alt="${game.title}" onerror="this.parentElement.innerHTML='<div class=\'no-icon\'>🎮</div>'">`
                     : `<div class="no-icon">🎮</div>`;
                 
                 html += `
@@ -293,7 +289,8 @@
                 card.addEventListener('click', () => {
                     const index = parseInt(card.dataset.index);
                     const game = allGames[index];
-                    window.location.href = `games/${game.folder}/main.html`;
+                    // Открываем игру в обёртке
+                    window.location.href = `game-wrapper.html?game=${encodeURIComponent(game.folder)}&title=${encodeURIComponent(game.title)}`;
                 });
             });
         }
@@ -323,4 +320,4 @@
         loadGames();
     </script>
 </body>
-      </html>
+</html>
