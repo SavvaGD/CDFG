@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Тур. Три в ряд — CDFG Games</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a0f1e 0%, #0a1a2a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', system-ui, monospace;
+        }
+
+        .game-container {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 48px;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.2);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 24px;
+            background: #0a0f1e;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .score-box {
+            background: #1e2a3a;
+            padding: 8px 24px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 1.4rem;
+            color: #00ff88;
+            font-family: monospace;
+        }
+
+        button {
+            background: linear-gradient(135deg, #00ff88, #00b4d8);
+            border: none;
+            border-radius: 40px;
+            padding: 8px 24px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.96);
+        }
+
+        .status {
+            font-size: 0.8rem;
+            color: #ffcc00;
+            background: #1e2a3a;
+            padding: 6px 16px;
+            border-radius: 40px;
+        }
+
+        @media (max-width: 550px) {
+            .game-container { padding: 12px; }
+            .score-box { font-size: 1rem; padding: 4px 16px; }
+            button { padding: 6px 16px; font-size: 0.8rem; }
+            .status { font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div class="info-panel">
+        <div class="score-box">🍬 Счёт: <span id="score">0</span></div>
+        <div class="status" id="statusMsg">✨ Меняй фигуры местами</div>
+        <button id="restartBtn">🔄 Заново</button>
+    </div>
+</div>
+
+<script>
+    (function(){
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreSpan = document.getElementById('score');
+        const statusDiv = document.getElementById('statusMsg');
+
+        // Параметры
+        const ROWS = 8;
+        const COLS = 8;
+        const TILE_SIZE = canvas.width / COLS; // 50px
+        const COLORS = [
+            '#FF5252', // красный
+            '#FFEB3B', // жёлтый
+            '#69F0AE', // зелёный
+            '#40C4FF', // голубой
+            '#E040FB', // фиолетовый
+            '#FF8A80'  // коралловый
+        ];
+
+        let board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+        let score = 0;
+        let selectedRow = -1, selectedCol = -1;
+        let processing = false; // блокировка во время анимаций/падения
+        let gameLoop = null;
+
+        // Инициализация случайной доски (без готовых линий)
+        function initBoard() {
+            for(let r=0; r<ROWS; r++){
+                for(let c=0; c<COLS; c++){
+                    board[r][c] = Math.floor(Math.random() * COLORS.length);
+                }
+            }
+            // Убираем линии, которые могли образоваться
+            while(clearMatches(true));
+        }
+
+        // Проверка и удаление линий (возвращает true если были удаления)
+        function clearMatches(justRemove=false) {
+            let toRemove = Array(ROWS).fill().map(() => Array(COLS).fill(false));
+            let any = false;
+
+            // Горизонтальные линии
+            for(let r=0; r<ROWS; r++){
+                let len = 1;
+                for(let c=1; c<=COLS; c++){
+                    if(c<COLS && board[r][c] === board[r][c-1] && board[r][c] !== -1){
+                        len++;
+                    } else {
+                        if(len >= 3){
+                            any = true;
+                            for(let i=c-len; i<c; i++) toRemove[r][i] = true;
+                        }
+                        len = 1;
+                    }
+                }
+            }
+
+            // Вертикальные линии
+            for(let c=0; c<COLS; c++){
+                let len = 1;
+                for(let r=1; r<=ROWS; r++){
+                    if(r<ROWS && board[r][c] === board[r-1][c] && board[r][c] !== -1){
+                        len++;
+                    } else {
+                        if(len >= 3){
+                            any = true;
+                            for(let i=r-len; i<r; i++) toRemove[i][c] = true;
+                        }
+                        len = 1;
+                    }
+                }
+            }
+
+            if(any){
+                let removedCount = 0;
+                for(let r=0; r<ROWS; r++){
+                    for(let c=0; c<COLS; c++){
+                        if(toRemove[r][c]){
+                            board[r][c] = -1;
+                            removedCount++;
+                        }
+                    }
+                }
+                if(!justRemove){
+                    // начисляем очки: 10 за каждую удалённую фигуру
+                    const addScore = removedCount * 10;
+                    score += addScore;
+                    scoreSpan.innerText = score;
+                    statusDiv.innerText = `🔥 Линия! +${addScore}`;
+                    setTimeout(() => {
+                        if(statusDiv.innerText.includes('+')) statusDiv.innerText = '✨ Меняй фигуры местами';
+                    }, 800);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        // Падение фигур вниз и заполнение новыми сверху
+        async function applyGravity() {
+            for(let c=0; c<COLS; c++){
+                let column = [];
+                for(let r=ROWS-1; r>=0; r--){
+                    if(board[r][c] !== -1){
+                        column.push(board[r][c]);
+                    }
+                }
+                while(column.length < ROWS){
+                    column.push(Math.floor(Math.random() * COLORS.length));
+                }
+                column.reverse();
+                for(let r=0; r<ROWS; r++){
+                    board[r][c] = column[r];
+                }
+            }
+            drawBoard();
+            await delay(120);
+            // После падения снова чистим линии
+            let hadMatches = clearMatches(false);
+            if(hadMatches){
+                drawBoard();
+                await delay(150);
+                await applyGravity();
+            }
+        }
+
+        function delay(ms){
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Меняем местами две ячейки
+        async function swapAndMatch(rowA, colA, rowB, colB){
+            if(processing) return false;
+            processing = true;
+            // Временно убираем выделение
+            selectedRow = -1; selectedCol = -1;
+            // Меняем
+            let temp = board[rowA][colA];
+            board[rowA][colA] = board[rowB][colB];
+            board[rowB][colB] = temp;
+            drawBoard();
+            await delay(100);
+            // Проверяем, есть ли линии после обмена
+            let hasMatches = clearMatches(false);
+            if(hasMatches){
+                drawBoard();
+                await delay(150);
+                await applyGravity();
+                processing = false;
+                return true;
+            } else {
+                // Откат обмена
+                temp = board[rowA][colA];
+                board[rowA][colA] = board[rowB][colB];
+                board[rowB][colB] = temp;
+                drawBoard();
+                statusDiv.innerText = '❌ Бесполезный обмен';
+                setTimeout(() => {
+                    if(statusDiv.innerText === '❌ Бесполезный обмен') statusDiv.innerText = '✨ Меняй фигуры местами';
+                }, 800);
+                processing = false;
+                return false;
+            }
+        }
+
+        // Отрисовка
+        function drawBoard(){
+            for(let r=0; r<ROWS; r++){
+                for(let c=0; c<COLS; c++){
+                    let val = board[r][c];
+                    let x = c * TILE_SIZE;
+                    let y = r * TILE_SIZE;
+                    if(val === -1){
+                        ctx.fillStyle = '#1e2a3a';
+                        ctx.fillRect(x, y, TILE_SIZE-1, TILE_SIZE-1);
+                    } else {
+                        ctx.fillStyle = COLORS[val % COLORS.length];
+                        ctx.shadowBlur = 6;
+                        ctx.shadowColor = 'rgba(0,255,136,0.3)';
+                        ctx.fillRect(x, y, TILE_SIZE-1, TILE_SIZE-1);
+                        ctx.shadowBlur = 0;
+                        // Блик
+                        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+                        ctx.fillRect(x+2, y+2, TILE_SIZE-5, 4);
+                    }
+                    // Рамка выделения
+                    if(r === selectedRow && c === selectedCol){
+                        ctx.strokeStyle = '#FFD966';
+                        ctx.lineWidth = 3;
+                        ctx.shadowBlur = 0;
+                        ctx.strokeRect(x+2, y+2, TILE_SIZE-5, TILE_SIZE-5);
+                    }
+                }
+            }
+            // сетка
+            ctx.beginPath();
+            ctx.strokeStyle = '#2a3a4a';
+            ctx.lineWidth = 0.5;
+            for(let i=0; i<=ROWS; i++){
+                ctx.moveTo(0, i*TILE_SIZE);
+                ctx.lineTo(canvas.width, i*TILE_SIZE);
+                ctx.stroke();
+                ctx.moveTo(i*TILE_SIZE, 0);
+                ctx.lineTo(i*TILE_SIZE, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        // Обработка кликов
+        function handleCanvasClick(e){
+            if(processing) return;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let clientX, clientY;
+            if(e.touches){
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+                e.preventDefault();
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            let canvasX = (clientX - rect.left) * scaleX;
+            let canvasY = (clientY - rect.top) * scaleY;
+            if(canvasX<0 || canvasY<0) return;
+            const col = Math.floor(canvasX / TILE_SIZE);
+            const row = Math.floor(canvasY / TILE_SIZE);
+            if(row<0 || row>=ROWS || col<0 || col>=COLS) return;
+
+            if(selectedRow === -1){
+                // первое нажатие
+                selectedRow = row;
+                selectedCol = col;
+                drawBoard();
+                statusDiv.innerText = '👉 Теперь выбери соседнюю фигуру';
+                setTimeout(() => {
+                    if(statusDiv.innerText === '👉 Теперь выбери соседнюю фигуру')
+                        statusDiv.innerText = '✨ Меняй фигуры местами';
+                }, 1500);
+            } else {
+                // второе нажатие — проверяем соседство
+                const dr = Math.abs(selectedRow - row);
+                const dc = Math.abs(selectedCol - col);
+                if((dr===1 && dc===0) || (dr===0 && dc===1)){
+                    swapAndMatch(selectedRow, selectedCol, row, col);
+                } else {
+                    statusDiv.innerText = '⚠️ Только соседние фигуры!';
+                    setTimeout(() => {
+                        if(statusDiv.innerText === '⚠️ Только соседние фигуры!') statusDiv.innerText = '✨ Меняй фигуры местами';
+                    }, 800);
+                }
+                selectedRow = -1;
+                selectedCol = -1;
+                drawBoard();
+            }
+        }
+
+        function restartGame(){
+            if(processing) return;
+            score = 0;
+            scoreSpan.innerText = '0';
+            statusDiv.innerText = '🔄 Новая игра';
+            initBoard();
+            selectedRow = -1;
+            selectedCol = -1;
+            processing = false;
+            drawBoard();
+            setTimeout(() => {
+                if(statusDiv.innerText === '🔄 Новая игра') statusDiv.innerText = '✨ Меняй фигуры местами';
+            }, 1200);
+        }
+
+        // события
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY, touches: e.touches };
+            handleCanvasClick(fakeEvent);
+        });
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
+
+        // Старт
+        initBoard();
+        drawBoard();
+    })();
+</script>
+</body>
+  </html>
