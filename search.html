@@ -148,6 +148,27 @@
             color: #ef4444;
         }
 
+        .load-more {
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .load-more-btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #00ff88;
+            border-radius: 40px;
+            padding: 0.7rem 2rem;
+            color: #00ff88;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .load-more-btn:hover {
+            background: rgba(0, 255, 136, 0.1);
+            transform: scale(1.02);
+        }
+
         .info {
             text-align: center;
             padding: 1rem;
@@ -189,8 +210,13 @@
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         const resultsContainer = document.getElementById('resultsContainer');
+        
+        let currentQuery = '';
+        let currentOffset = 0;
+        let allResults = [];
+        let isLoading = false;
 
-        async function search() {
+        async function search(reset = true) {
             const query = searchInput.value.trim();
             
             if (query === "") {
@@ -198,52 +224,64 @@
                 return;
             }
 
-            resultsContainer.innerHTML = '<div class="loading">🔍 Ищем...</div>';
+            if (reset) {
+                currentQuery = query;
+                currentOffset = 0;
+                allResults = [];
+                resultsContainer.innerHTML = '<div class="loading">🔍 Ищем...</div>';
+            } else {
+                if (isLoading) return;
+                isLoading = true;
+                const loadMoreDiv = document.querySelector('.load-more');
+                if (loadMoreDiv) loadMoreDiv.remove();
+                resultsContainer.insertAdjacentHTML('beforeend', '<div class="loading" id="moreLoading">🔄 Загружаем ещё...</div>');
+            }
 
             try {
-                // Используем DuckDuckGo через JSONP (обход CORS)
+                // Используем DuckDuckGo через JSONP с параметром offset
                 const script = document.createElement('script');
-                const callbackName = 'ddgCallback' + Date.now();
+                const callbackName = 'ddgCallback' + Date.now() + currentOffset;
                 
                 window[callbackName] = function(data) {
-                    displayResults(data, query);
+                    processResults(data, reset);
                     delete window[callbackName];
                     document.body.removeChild(script);
+                    isLoading = false;
+                    document.getElementById('moreLoading')?.remove();
                 };
                 
-                script.src = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&pretty=1&no_html=1&callback=${callbackName}`;
+                // DuckDuckGo API не имеет пагинации, поэтому используем разные параметры для смещения
+                // Вместо этого используем имитацию пагинации через разные запросы с лимитом
+                script.src = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&pretty=1&no_html=1&skip_disambig=1&callback=${callbackName}`;
                 document.body.appendChild(script);
                 
-                // Таймаут на случай ошибки
                 setTimeout(() => {
                     if (window[callbackName]) {
                         delete window[callbackName];
                         document.body.removeChild(script);
-                        resultsContainer.innerHTML = `
-                            <div class="error">
-                                ⚠️ Превышено время ожидания<br>
-                                <small>Попробуйте другой запрос</small>
-                            </div>
-                        `;
+                        isLoading = false;
+                        document.getElementById('moreLoading')?.remove();
+                        if (reset) {
+                            resultsContainer.innerHTML = '<div class="error">⚠️ Превышено время ожидания<br><small>Попробуйте другой запрос</small></div>';
+                        }
                     }
                 }, 10000);
                 
             } catch (error) {
-                resultsContainer.innerHTML = `
-                    <div class="error">
-                        ⚠️ Ошибка поиска<br>
-                        <small>Попробуйте позже</small>
-                    </div>
-                `;
+                isLoading = false;
+                document.getElementById('moreLoading')?.remove();
+                if (reset) {
+                    resultsContainer.innerHTML = '<div class="error">⚠️ Ошибка поиска<br><small>Попробуйте позже</small></div>';
+                }
             }
         }
 
-        function displayResults(data, query) {
-            const results = [];
+        function processResults(data, reset) {
+            const newResults = [];
             
             // Основной ответ
-            if (data.AbstractText) {
-                results.push({
+            if (data.AbstractText && !allResults.some(r => r.url === data.AbstractURL)) {
+                newResults.push({
                     title: data.AbstractSource || 'Результат',
                     url: data.AbstractURL || '#',
                     snippet: data.AbstractText
@@ -258,27 +296,55 @@
                         let firstLine = text.split('.')[0];
                         let url = topic.FirstURL || '#';
                         
-                        results.push({
-                            title: firstLine.length > 60 ? firstLine.substring(0, 60) + '...' : firstLine,
-                            url: url,
-                            snippet: text.length > 200 ? text.substring(0, 200) + '...' : text
-                        });
+                        if (!allResults.some(r => r.url === url) && !newResults.some(r => r.url === url)) {
+                            newResults.push({
+                                title: firstLine.length > 80 ? firstLine.substring(0, 80) + '...' : firstLine,
+                                url: url,
+                                snippet: text.length > 200 ? text.substring(0, 200) + '...' : text
+                            });
+                        }
                     }
-                    if (results.length >= 15) break;
                 }
             }
             
-            if (results.length === 0) {
+            if (newResults.length === 0 && reset) {
                 resultsContainer.innerHTML = `
                     <div class="no-results">
-                        😕 Ничего не найдено по запросу «${escapeHtml(query)}»
+                        😕 Ничего не найдено по запросу «${escapeHtml(currentQuery)}»
                     </div>
                 `;
                 return;
             }
             
+            if (reset) {
+                allResults = newResults;
+            } else {
+                allResults = [...allResults, ...newResults];
+            }
+            
+            displayResults();
+            
+            // Добавляем кнопку "Загрузить ещё", если есть результаты и мы не в конце
+            // DuckDuckGo не даёт реальную пагинацию, поэтому показываем кнопку, но она грузит те же данные
+            // Для реальной пагинации нужен Bing API
+            if (allResults.length > 0) {
+                const loadMoreDiv = document.querySelector('.load-more');
+                if (!loadMoreDiv) {
+                    resultsContainer.insertAdjacentHTML('beforeend', `
+                        <div class="load-more">
+                            <button class="load-more-btn" id="loadMoreBtn">📥 Показать ещё (те же результаты, для реальной пагинации нужен Bing API)</button>
+                        </div>
+                    `);
+                    document.getElementById('loadMoreBtn')?.addEventListener('click', () => {
+                        search(false);
+                    });
+                }
+            }
+        }
+        
+        function displayResults() {
             let html = '';
-            for (let res of results) {
+            for (let res of allResults) {
                 html += `
                     <div class="result-item">
                         <div class="result-title"><a href="${res.url}" target="_blank">${escapeHtml(res.title)}</a></div>
@@ -288,7 +354,14 @@
                 `;
             }
             
-            resultsContainer.innerHTML = html;
+            // Сохраняем кнопку "Загрузить ещё", если она есть
+            const loadMoreDiv = document.querySelector('.load-more');
+            if (loadMoreDiv) {
+                resultsContainer.innerHTML = html;
+                resultsContainer.appendChild(loadMoreDiv);
+            } else {
+                resultsContainer.innerHTML = html;
+            }
         }
         
         function escapeHtml(text) {
@@ -298,9 +371,9 @@
             return div.innerHTML;
         }
 
-        searchBtn.addEventListener('click', search);
+        searchBtn.addEventListener('click', () => search(true));
         searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') search();
+            if (e.key === 'Enter') search(true);
         });
     </script>
 </body>
