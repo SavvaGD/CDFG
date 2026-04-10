@@ -238,71 +238,43 @@
             }
 
             try {
-                // Используем DuckDuckGo через JSONP с параметром offset
-                const script = document.createElement('script');
-                const callbackName = 'ddgCallback' + Date.now() + currentOffset;
+                // Используем Whoogle (метапоиск, поддерживает пагинацию через start)
+                const url = `https://whoogle.sdfeu.org/search?q=${encodeURIComponent(query)}&format=json&start=${currentOffset}`;
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
                 
-                window[callbackName] = function(data) {
-                    processResults(data, reset);
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    isLoading = false;
-                    document.getElementById('moreLoading')?.remove();
-                };
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+                const jsonData = JSON.parse(data.contents);
                 
-                // DuckDuckGo API не имеет пагинации, поэтому используем разные параметры для смещения
-                // Вместо этого используем имитацию пагинации через разные запросы с лимитом
-                script.src = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&pretty=1&no_html=1&skip_disambig=1&callback=${callbackName}`;
-                document.body.appendChild(script);
-                
-                setTimeout(() => {
-                    if (window[callbackName]) {
-                        delete window[callbackName];
-                        document.body.removeChild(script);
-                        isLoading = false;
-                        document.getElementById('moreLoading')?.remove();
-                        if (reset) {
-                            resultsContainer.innerHTML = '<div class="error">⚠️ Превышено время ожидания<br><small>Попробуйте другой запрос</small></div>';
-                        }
-                    }
-                }, 10000);
+                processResults(jsonData, reset);
                 
             } catch (error) {
+                console.error(error);
+                if (reset) {
+                    resultsContainer.innerHTML = `
+                        <div class="error">
+                            ⚠️ Ошибка поиска<br>
+                            <small>Попробуйте позже или используйте DuckDuckGo</small>
+                        </div>
+                    `;
+                }
+            } finally {
                 isLoading = false;
                 document.getElementById('moreLoading')?.remove();
-                if (reset) {
-                    resultsContainer.innerHTML = '<div class="error">⚠️ Ошибка поиска<br><small>Попробуйте позже</small></div>';
-                }
             }
         }
 
         function processResults(data, reset) {
             const newResults = [];
             
-            // Основной ответ
-            if (data.AbstractText && !allResults.some(r => r.url === data.AbstractURL)) {
-                newResults.push({
-                    title: data.AbstractSource || 'Результат',
-                    url: data.AbstractURL || '#',
-                    snippet: data.AbstractText
-                });
-            }
-            
-            // Связанные темы
-            if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-                for (let topic of data.RelatedTopics) {
-                    if (typeof topic === 'object' && topic.Text) {
-                        let text = topic.Text;
-                        let firstLine = text.split('.')[0];
-                        let url = topic.FirstURL || '#';
-                        
-                        if (!allResults.some(r => r.url === url) && !newResults.some(r => r.url === url)) {
-                            newResults.push({
-                                title: firstLine.length > 80 ? firstLine.substring(0, 80) + '...' : firstLine,
-                                url: url,
-                                snippet: text.length > 200 ? text.substring(0, 200) + '...' : text
-                            });
-                        }
+            if (data && data.organic_results) {
+                for (let res of data.organic_results) {
+                    if (!allResults.some(r => r.url === res.link) && !newResults.some(r => r.url === res.link)) {
+                        newResults.push({
+                            title: res.title || 'Результат',
+                            url: res.link || '#',
+                            snippet: res.snippet || ''
+                        });
                     }
                 }
             }
@@ -324,18 +296,17 @@
             
             displayResults();
             
-            // Добавляем кнопку "Загрузить ещё", если есть результаты и мы не в конце
-            // DuckDuckGo не даёт реальную пагинацию, поэтому показываем кнопку, но она грузит те же данные
-            // Для реальной пагинации нужен Bing API
-            if (allResults.length > 0) {
+            // Если есть ещё результаты (Whoogle вернул полную страницу), показываем кнопку
+            if (data && data.organic_results && data.organic_results.length > 0) {
                 const loadMoreDiv = document.querySelector('.load-more');
                 if (!loadMoreDiv) {
                     resultsContainer.insertAdjacentHTML('beforeend', `
                         <div class="load-more">
-                            <button class="load-more-btn" id="loadMoreBtn">📥 Показать ещё (те же результаты, для реальной пагинации нужен Bing API)</button>
+                            <button class="load-more-btn" id="loadMoreBtn">📥 Показать ещё</button>
                         </div>
                     `);
                     document.getElementById('loadMoreBtn')?.addEventListener('click', () => {
+                        currentOffset += 10;
                         search(false);
                     });
                 }
@@ -354,7 +325,6 @@
                 `;
             }
             
-            // Сохраняем кнопку "Загрузить ещё", если она есть
             const loadMoreDiv = document.querySelector('.load-more');
             if (loadMoreDiv) {
                 resultsContainer.innerHTML = html;
