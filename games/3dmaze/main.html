@@ -57,6 +57,39 @@
             border: 2px solid gold;
             white-space: nowrap;
         }
+        /* Стили джойстика — появляются ТОЛЬКО на сенсорных экранах */
+        .joystick-container {
+            position: fixed;
+            bottom: 100px;
+            left: 100px;
+            width: 120px;
+            height: 120px;
+            border-radius: 60px;
+            background: rgba(30,30,40,0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0,255,0,0.4);
+            z-index: 15;
+            touch-action: none;
+            display: none; /* по умолчанию скрыт */
+        }
+        .joystick-base {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 60px;
+            background: rgba(0,0,0,0.4);
+        }
+        .joystick-thumb {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: #00ff88;
+            border-radius: 25px;
+            top: 35px;
+            left: 35px;
+            box-shadow: 0 0 10px #00ff88;
+            cursor: pointer;
+        }
         @media (max-width: 600px) {
             #info { font-size: 10px; top: 10px; left: 10px; }
             #controls { font-size: 8px; }
@@ -76,6 +109,12 @@
         ✨ Ты победил лабиринт ✨
     </div>
 
+    <!-- Джойстик (показывается только на телефонах) -->
+    <div id="joystickContainer" class="joystick-container">
+        <div class="joystick-base"></div>
+        <div id="joystickThumb" class="joystick-thumb"></div>
+    </div>
+
     <!-- Подключаем Three.js -->
     <script type="importmap">
         {
@@ -88,8 +127,11 @@
     <script type="module">
         import * as THREE from 'three';
 
+        // ---------- ОПРЕДЕЛЯЕМ, ТЕЛЕФОН ЛИ ЭТО ----------
+        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+        
         // ---------- НАСТРОЙКИ ----------
-        const mazeSize = 11;      // нечётное, чтобы старт и финиш были по краям
+        const mazeSize = 11;
         const cellSize = 2.5;
         const wallHeight = 2.5;
         const playerSpeed = 5.0;
@@ -97,9 +139,7 @@
         
         // Генерация лабиринта (рекурсивный бэктрекинг)
         function generateMaze(size) {
-            // размер должен быть нечётным
             let maze = Array(size).fill().map(() => Array(size).fill(1));
-            // проходим по всем нечётным координатам
             function carve(x, z) {
                 const dirs = [[0, -2], [2, 0], [0, 2], [-2, 0]];
                 for (let i = dirs.length - 1; i > 0; i--) {
@@ -123,9 +163,7 @@
             }
             maze[1][1] = 0;
             carve(1, 1);
-            // Выход - правый нижний угол
-            maze[size-2][size-2] = 2; // 2 = выход
-            // Добавим несколько кристаллов (бонусов)
+            maze[size-2][size-2] = 2;
             let bonuses = [];
             for (let i=0; i<12; i++) {
                 let x, z;
@@ -153,20 +191,19 @@
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
         
-        // ----- ОСВЕЩЕНИЕ -----
+        // Освещение
         const ambientLight = new THREE.AmbientLight(0x404060);
         scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xffffff, 1);
         dirLight.position.set(10, 20, 5);
         dirLight.castShadow = true;
-        dirLight.receiveShadow = true;
         scene.add(dirLight);
         const fillLight = new THREE.PointLight(0x4466cc, 0.3);
         fillLight.position.set(0, 5, 0);
         scene.add(fillLight);
         
         // Пол
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.6, metalness: 0.1 });
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.6 });
         const floorPlane = new THREE.Mesh(new THREE.PlaneGeometry(mazeSize*cellSize, mazeSize*cellSize), floorMat);
         floorPlane.rotation.x = -Math.PI/2;
         floorPlane.position.y = -0.05;
@@ -174,17 +211,15 @@
         scene.add(floorPlane);
         
         // Стены
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.3, metalness: 0.05 });
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.3 });
         const topMat = new THREE.MeshStandardMaterial({ color: 0xbc8f6b });
         
-        function addWall(x, z, rx, rz, lenX, lenZ) {
+        function addWall(x, z, lenX, lenZ) {
             const wallGeo = new THREE.BoxGeometry(lenX, wallHeight, lenZ);
             const wall = new THREE.Mesh(wallGeo, wallMat);
             wall.position.set(x, wallHeight/2, z);
             wall.castShadow = true;
-            wall.receiveShadow = true;
             scene.add(wall);
-            // верхушка
             const capGeo = new THREE.BoxGeometry(lenX+0.05, 0.1, lenZ+0.05);
             const cap = new THREE.Mesh(capGeo, topMat);
             cap.position.set(x, wallHeight-0.05, z);
@@ -197,27 +232,24 @@
                 if (maze[i][j] === 1) {
                     const worldX = (j - mazeSize/2) * cellSize;
                     const worldZ = (i - mazeSize/2) * cellSize;
-                    addWall(worldX, worldZ, 0,0, cellSize, cellSize);
+                    addWall(worldX, worldZ, cellSize, cellSize);
                 }
             }
         }
         
-        // Выход (золотая арка)
+        // Выход
         const exitWorldX = (exitX - mazeSize/2) * cellSize;
         const exitWorldZ = (exitZ - mazeSize/2) * cellSize;
         const archMat = new THREE.MeshStandardMaterial({ color: 0xffaa33, emissive: 0x442200 });
         const exitPillarL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, 0.4), archMat);
         exitPillarL.position.set(exitWorldX - 0.8, 1.1, exitWorldZ);
-        exitPillarL.castShadow = true;
         const exitPillarR = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, 0.4), archMat);
         exitPillarR.position.set(exitWorldX + 0.8, 1.1, exitWorldZ);
-        exitPillarR.castShadow = true;
         const exitBeam = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.3, 0.4), archMat);
         exitBeam.position.set(exitWorldX, 2.0, exitWorldZ);
-        exitBeam.castShadow = true;
         scene.add(exitPillarL, exitPillarR, exitBeam);
         
-        // Бонусы - кристаллы
+        // Бонусы
         const bonusGroup = [];
         const gemMat = new THREE.MeshStandardMaterial({ color: 0x33ccff, emissive: 0x0066aa });
         bonuses.forEach(b => {
@@ -232,36 +264,38 @@
             }
         });
         
-        // Стартовая позиция игрока
+        // Игрок
         let playerX = (1 - mazeSize/2) * cellSize;
         let playerZ = (1 - mazeSize/2) * cellSize;
-        let playerAngle = 0; // угол поворота в радианах
-        camera.position.x = playerX;
-        camera.position.z = playerZ;
-        camera.position.y = 1.6;
-        camera.rotation.order = 'YXZ';
-        
         let yaw = -Math.PI/4;
         let pitch = 0;
         
-        // Управление
+        // Управление с клавиатуры
         const keyState = { w: false, s: false, a: false, d: false };
-        let mouseX = 0, mouseY = 0;
-        let firstMouse = true;
+        
+        // Управление с джойстика (для телефонов)
+        let joystickVector = { x: 0, z: 0 };
         
         function updateMovement(deltaTime) {
             let move = new THREE.Vector3(0,0,0);
             const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
             const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-            if (keyState.w) move.add(forward);
-            if (keyState.s) move.sub(forward);
-            if (keyState.d) move.add(right);
-            if (keyState.a) move.sub(right);
+            
+            // Если есть активный джойстик и это телефон — используем его
+            if (isTouchDevice && (joystickVector.x !== 0 || joystickVector.z !== 0)) {
+                move.addScaledVector(forward, joystickVector.z);
+                move.addScaledVector(right, joystickVector.x);
+            } else {
+                if (keyState.w) move.add(forward);
+                if (keyState.s) move.sub(forward);
+                if (keyState.d) move.add(right);
+                if (keyState.a) move.sub(right);
+            }
+            
             move.normalize();
             let newX = playerX + move.x * playerSpeed * deltaTime;
             let newZ = playerZ + move.z * playerSpeed * deltaTime;
             
-            // Коллизия со стенами (клетки)
             const checkCollision = (nx, nz) => {
                 const gridX = Math.round(nx / cellSize + mazeSize/2);
                 const gridZ = Math.round(nz / cellSize + mazeSize/2);
@@ -296,42 +330,35 @@
                 }
             }
             
-            // Проверка выхода (только если все бонусы собраны)
             const exitDist = Math.hypot(playerX - exitWorldX, playerZ - exitWorldZ);
             if (bonusGroup.length === 0 && exitDist < 1.2) {
                 document.getElementById('winMessage').style.display = 'block';
                 setTimeout(() => {
-                    // перезапуск через 3 секунды (опционально)
                     window.location.reload();
                 }, 3000);
             }
         }
         
-        // Обработка ввода
+        // --- Управление с клавиатуры (всегда активно) ---
         window.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
-            if (k === 'w') keyState.w = true;
-            if (k === 's') keyState.s = true;
-            if (k === 'a') keyState.a = true;
-            if (k === 'd') keyState.d = true;
-            if (k === 'arrowup') keyState.w = true;
-            if (k === 'arrowdown') keyState.s = true;
-            if (k === 'arrowleft') keyState.a = true;
-            if (k === 'arrowright') keyState.d = true;
+            if (k === 'w' || k === 'arrowup') keyState.w = true;
+            if (k === 's' || k === 'arrowdown') keyState.s = true;
+            if (k === 'a' || k === 'arrowleft') keyState.a = true;
+            if (k === 'd' || k === 'arrowright') keyState.d = true;
         });
         window.addEventListener('keyup', (e) => {
             const k = e.key.toLowerCase();
-            if (k === 'w') keyState.w = false;
-            if (k === 's') keyState.s = false;
-            if (k === 'a') keyState.a = false;
-            if (k === 'd') keyState.d = false;
-            if (k === 'arrowup') keyState.w = false;
-            if (k === 'arrowdown') keyState.s = false;
-            if (k === 'arrowleft') keyState.a = false;
-            if (k === 'arrowright') keyState.d = false;
+            if (k === 'w' || k === 'arrowup') keyState.w = false;
+            if (k === 's' || k === 'arrowdown') keyState.s = false;
+            if (k === 'a' || k === 'arrowleft') keyState.a = false;
+            if (k === 'd' || k === 'arrowright') keyState.d = false;
         });
         
-        // Мышь / сенсорное управление
+        // --- Поворот камеры (мышь / сенсор без джойстика) ---
+        let mouseX = 0, mouseY = 0;
+        let firstMouse = true;
+        
         renderer.domElement.addEventListener('mousemove', (e) => {
             if (firstMouse) {
                 mouseX = e.clientX;
@@ -368,7 +395,68 @@
             }
         });
         
-        // Анимация
+        // --- ДЖОЙСТИК (только если телефон) ---
+        if (isTouchDevice) {
+            const joystickContainer = document.getElementById('joystickContainer');
+            const joystickThumb = document.getElementById('joystickThumb');
+            joystickContainer.style.display = 'block';
+            
+            let active = false;
+            const center = { x: 60, y: 60 }; // центр джойстика (относительно контейнера)
+            let thumbPos = { x: 35, y: 35 };
+            
+            const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+            
+            const updateJoystick = (clientX, clientY) => {
+                const rect = joystickContainer.getBoundingClientRect();
+                const relativeX = clientX - rect.left;
+                const relativeY = clientY - rect.top;
+                let dx = relativeX - center.x;
+                let dy = relativeY - center.y;
+                const distance = Math.hypot(dx, dy);
+                const maxDist = 40;
+                if (distance > maxDist) {
+                    dx = dx / distance * maxDist;
+                    dy = dy / distance * maxDist;
+                }
+                thumbPos.x = center.x + dx - 25;
+                thumbPos.y = center.y + dy - 25;
+                joystickThumb.style.left = thumbPos.x + 'px';
+                joystickThumb.style.top = thumbPos.y + 'px';
+                
+                // нормализованный вектор движения (-1..1)
+                joystickVector.x = clamp(dx / maxDist, -1, 1);
+                joystickVector.z = clamp(dy / maxDist, -1, 1);
+            };
+            
+            const resetJoystick = () => {
+                thumbPos = { x: 35, y: 35 };
+                joystickThumb.style.left = '35px';
+                joystickThumb.style.top = '35px';
+                joystickVector = { x: 0, z: 0 };
+                active = false;
+            };
+            
+            joystickContainer.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                active = true;
+                const touch = e.touches[0];
+                updateJoystick(touch.clientX, touch.clientY);
+            });
+            
+            window.addEventListener('touchmove', (e) => {
+                if (active && e.touches.length) {
+                    e.preventDefault();
+                    updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            });
+            
+            window.addEventListener('touchend', () => {
+                if (active) resetJoystick();
+            });
+        }
+        
+        // --- Анимация ---
         let lastTime = performance.now() / 1000;
         function animate() {
             const now = performance.now() / 1000;
@@ -391,11 +479,10 @@
         
         animate();
         
-        // Начальная подсказка
         setTimeout(() => {
             const infoDiv = document.getElementById('info');
             infoDiv.innerHTML = `🧭 3D MAZE | ✨ Собери все ${bonusGroup.length} кристаллов, чтобы открыть выход!`;
         }, 500);
     </script>
 </body>
-  </html>
+</html>
