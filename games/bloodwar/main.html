@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Blood War — CDFG Games</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(145deg, #2a0a0a 0%, #1a0202 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'Segoe UI', monospace;
+            padding: 16px;
+        }
+        .game-container {
+            max-width: 1200px;
+            width: 100%;
+            background: rgba(0,0,0,0.7);
+            border-radius: 32px;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+            border: 2px solid #8b0000;
+            box-shadow: 0 0 30px rgba(255,0,0,0.3);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #8b0000;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff4444;
+            text-shadow: 0 0 5px darkred;
+            letter-spacing: 4px;
+        }
+        .sub {
+            color: #aa5555;
+            font-size: 0.8rem;
+        }
+        .stats {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 12px;
+            background: #1a0505;
+            padding: 12px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #8b0000;
+        }
+        .stat-card {
+            background: #2a0a0a;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-align: center;
+            flex: 1;
+            min-width: 100px;
+        }
+        .stat-label {
+            font-size: 0.7rem;
+            color: #aa8888;
+        }
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #ff8888;
+        }
+        .enemy-panel {
+            background: #1a0505;
+            border-radius: 24px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #8b0000;
+        }
+        .enemy-name {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #ff6666;
+            margin-bottom: 10px;
+        }
+        .enemy-desc {
+            color: #ccaaaa;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .action-btn {
+            background: #3a0a0a;
+            border: 1px solid #aa3333;
+            color: #ffaaaa;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-family: monospace;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s;
+            flex: 1;
+            min-width: 120px;
+        }
+        .action-btn:active {
+            transform: scale(0.96);
+            background: #5a0a0a;
+        }
+        .log {
+            background: #0a0202;
+            border-radius: 20px;
+            padding: 12px;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            color: #aa8888;
+            border: 1px solid #8b0000;
+        }
+        .log p {
+            margin: 4px 0;
+            border-left: 2px solid #8b0000;
+            padding-left: 8px;
+        }
+        .reset-btn {
+            background: #8b0000;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 40px;
+            margin-top: 16px;
+            width: 100%;
+            font-family: monospace;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        @media (max-width: 700px) {
+            .game-container { padding: 12px; }
+            .title { font-size: 1.4rem; }
+            .stat-value { font-size: 1.2rem; }
+            .enemy-name { font-size: 1.1rem; }
+            .action-btn { padding: 6px 12px; font-size: 0.7rem; min-width: 80px; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="title">🔥 BLOOD WAR 🔥</div>
+        <div class="sub">3046 год | Геймо против ОСС (Объединённый Союз Савай)</div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card"><div class="stat-label">💰 КАЗНА ГЕЙМО</div><div class="stat-value" id="money">5000</div></div>
+        <div class="stat-card"><div class="stat-label">⚔️ ВОЙСКО</div><div class="stat-value" id="army">500</div></div>
+        <div class="stat-card"><div class="stat-label">👥 МИРНЫЕ</div><div class="stat-value" id="civilians">2000</div></div>
+        <div class="stat-card"><div class="stat-label">🎖️ СПЕЦЫ (против дронов)</div><div class="stat-value" id="spec">50</div></div>
+        <div class="stat-card"><div class="stat-label">💣 МИНЫ</div><div class="stat-value" id="mines">20</div></div>
+    </div>
+
+    <div class="enemy-panel" id="enemyPanel">
+        <div class="enemy-name" id="enemyName">Пехота ОСС</div>
+        <div class="enemy-desc" id="enemyDesc">Самый слабый враг. Убивает мирных жителей.</div>
+        <div class="actions" id="actionsContainer"></div>
+    </div>
+
+    <div class="log" id="log">
+        <p>⚔️ Добро пожаловать, правитель Геймо. ОСС наступает.</p>
+        <p>💰 У вас 5000 саванских рублей. Защитите народ!</p>
+    </div>
+
+    <button class="reset-btn" id="resetBtn">🔄 Новая игра</button>
+</div>
+
+<script>
+    // --- Враги ОСС ---
+    const ENEMIES = [
+        { name: "Пехота ОСС", desc: "Самый слабый враг. Можно убить своей пехотой. При неубийстве убивает мирных жителей.", 
+          hp: 30, reward: 50, civilianDamage: 30, armyDamage: 0, needSpecial: false, needMine: false, armored: false, specialEffect: null },
+        { name: "Террорист ОСС", desc: "Можно убить пехотой. При неубийстве убивает мирных жестче и устраивает теракты.",
+          hp: 25, reward: 80, civilianDamage: 60, armyDamage: 20, needSpecial: false, needMine: false, armored: false, specialEffect: "terror" },
+        { name: "Дрон ОСС", desc: "Нужен специалист по дронам. При неубивании взрывает мирных.",
+          hp: 20, reward: 100, civilianDamage: 50, armyDamage: 0, needSpecial: true, needMine: false, armored: false, specialEffect: null },
+        { name: "Танк ОСС", desc: "Нужны мины или военные. При неубивании — очень плохие последствия.",
+          hp: 60, reward: 200, civilianDamage: 80, armyDamage: 40, needSpecial: false, needMine: true, armored: false, specialEffect: "heavy" },
+        { name: "Бронированный танк ОСС", desc: "Очень сложно уничтожить. Нужны мины + военные.",
+          hp: 100, reward: 400, civilianDamage: 120, armyDamage: 60, needSpecial: false, needMine: true, armored: true, specialEffect: "heavy" }
+    ];
+
+    let gameState = {
+        money: 5000,
+        army: 500,
+        civilians: 2000,
+        spec: 50,
+        mines: 20,
+        currentEnemyIndex: 0,
+        enemiesDefeated: 0
+    };
+
+    let currentEnemy = null;
+
+    function updateUI() {
+        document.getElementById('money').innerText = Math.floor(gameState.money);
+        document.getElementById('army').innerText = Math.floor(gameState.army);
+        document.getElementById('civilians').innerText = Math.floor(gameState.civilians);
+        document.getElementById('spec').innerText = Math.floor(gameState.spec);
+        document.getElementById('mines').innerText = Math.floor(gameState.mines);
+    }
+
+    function addLog(msg, isError = false) {
+        const logDiv = document.getElementById('log');
+        const p = document.createElement('p');
+        p.innerHTML = msg;
+        if (isError) p.style.color = "#ff8888";
+        else p.style.color = "#aa8888";
+        logDiv.appendChild(p);
+        p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (logDiv.children.length > 30) logDiv.removeChild(logDiv.children[0]);
+    }
+
+    function checkGameOver() {
+        if (gameState.civilians <= 0) {
+            addLog("💀 ВСЕ МИРНЫЕ ПОГИБЛИ. ГЕЙМО ПАЛ. ВЫ ПРОИГРАЛИ 💀", true);
+            disableActions();
+            return true;
+        }
+        if (gameState.army <= 0 && gameState.spec <= 0 && gameState.mines <= 0) {
+            addLog("💀 У ГЕЙМО НЕ ОСТАЛОСЬ СИЛ. ОСС ПОБЕДИЛА. 💀", true);
+            disableActions();
+            return true;
+        }
+        if (gameState.enemiesDefeated >= 20) {
+            addLog("🏆 ПОБЕДА! ВЫ ОТБРОСИЛИ ОСС И ЗАЩИТИЛИ ГЕЙМО! 🏆", false);
+            disableActions();
+            return true;
+        }
+        return false;
+    }
+
+    function disableActions() {
+        const container = document.getElementById('actionsContainer');
+        container.innerHTML = '<div style="color:#aa5555; text-align:center;">Игра окончена. Нажмите "Новая игра"</div>';
+    }
+
+    function nextEnemy() {
+        gameState.enemiesDefeated++;
+        if (checkGameOver()) return;
+        // случайный враг
+        const randomIndex = Math.floor(Math.random() * ENEMIES.length);
+        currentEnemy = { ...ENEMIES[randomIndex] };
+        document.getElementById('enemyName').innerHTML = `⚔️ ${currentEnemy.name} ⚔️`;
+        document.getElementById('enemyDesc').innerHTML = currentEnemy.desc;
+        renderActions();
+        updateUI();
+    }
+
+    function applyPenalty() {
+        let msg = `⚠️ ${currentEnemy.name} атакует! `;
+        let killed = 0;
+        if (currentEnemy.civilianDamage > 0) {
+            let loss = Math.min(gameState.civilians, currentEnemy.civilianDamage);
+            gameState.civilians -= loss;
+            killed += loss;
+            msg += `Убито мирных: ${loss}. `;
+        }
+        if (currentEnemy.armyDamage > 0) {
+            let lossArmy = Math.min(gameState.army, currentEnemy.armyDamage);
+            gameState.army -= lossArmy;
+            msg += `Уничтожено войск: ${lossArmy}. `;
+        }
+        if (currentEnemy.specialEffect === "terror") {
+            let extraLoss = Math.floor(gameState.civilians * 0.1);
+            gameState.civilians -= extraLoss;
+            msg += `Теракт: ещё ${extraLoss} мирных. `;
+        }
+        if (currentEnemy.specialEffect === "heavy") {
+            let armyLoss = Math.floor(gameState.army * 0.15);
+            gameState.army -= armyLoss;
+            msg += `Тяжёлые потери: -${armyLoss} войска. `;
+        }
+        addLog(msg, true);
+        updateUI();
+        if (checkGameOver()) return;
+        nextEnemy();
+    }
+
+    function attemptKill(option) {
+        let success = false;
+        let costMoney = 0;
+        let costArmy = 0;
+        let costSpec = 0;
+        let costMines = 0;
+
+        if (option === "army") {
+            if (gameState.army >= 20) {
+                costArmy = 20;
+                success = Math.random() < 0.85;
+            } else { addLog("❌ Недостаточно войска!", true); return; }
+        } else if (option === "spec") {
+            if (gameState.spec >= 5) {
+                costSpec = 5;
+                success = Math.random() < 0.9;
+            } else { addLog("❌ Нет специалистов по дронам!", true); return; }
+        } else if (option === "mines") {
+            if (gameState.mines >= 3) {
+                costMines = 3;
+                success = Math.random() < 0.7;
+            } else { addLog("❌ Недостаточно мин!", true); return; }
+        } else if (option === "mines+army" && currentEnemy.armored) {
+            if (gameState.mines >= 5 && gameState.army >= 30) {
+                costMines = 5;
+                costArmy = 30;
+                success = Math.random() < 0.95;
+            } else { addLog("❌ Нужно 5 мин и 30 войска!", true); return; }
+        } else if (option === "money") {
+            if (gameState.money >= currentEnemy.reward * 2) {
+                costMoney = currentEnemy.reward * 2;
+                success = Math.random() < 0.6;
+            } else { addLog("❌ Не хватает денег для подкупа!", true); return; }
+        } else {
+            addLog("❌ Неправильный способ!", true);
+            return;
+        }
+
+        if (success) {
+            gameState.money += currentEnemy.reward;
+            addLog(`✅ ${currentEnemy.name} уничтожен! +${currentEnemy.reward} с.руб.`, false);
+            gameState.enemiesDefeated++;
+            if (checkGameOver()) return;
+            nextEnemy();
+        } else {
+            addLog(`💥 Провал! ${currentEnemy.name} выжил и контратакует!`, true);
+            applyPenalty();
+        }
+
+        gameState.army -= costArmy;
+        gameState.spec -= costSpec;
+        gameState.mines -= costMines;
+        gameState.money -= costMoney;
+        updateUI();
+        if (gameState.army < 0) gameState.army = 0;
+        if (gameState.spec < 0) gameState.spec = 0;
+        if (gameState.mines < 0) gameState.mines = 0;
+        if (gameState.money < 0) gameState.money = 0;
+        updateUI();
+    }
+
+    function renderActions() {
+        const container = document.getElementById('actionsContainer');
+        container.innerHTML = '';
+        
+        const btnArmy = document.createElement('button');
+        btnArmy.innerText = '⚔️ Пехота (20 войска)';
+        btnArmy.className = 'action-btn';
+        btnArmy.onclick = () => attemptKill('army');
+        container.appendChild(btnArmy);
+
+        if (currentEnemy.needSpecial) {
+            const btnSpec = document.createElement('button');
+            btnSpec.innerText = '🎯 Спец по дронам (5 спецов)';
+            btnSpec.className = 'action-btn';
+            btnSpec.onclick = () => attemptKill('spec');
+            container.appendChild(btnSpec);
+        }
+
+        if (currentEnemy.needMine) {
+            if (currentEnemy.armored) {
+                const btnMineArmy = document.createElement('button');
+                btnMineArmy.innerText = '💣 Мины + Армия (5 мин + 30 войска)';
+                btnMineArmy.className = 'action-btn';
+                btnMineArmy.onclick = () => attemptKill('mines+army');
+                container.appendChild(btnMineArmy);
+            } else {
+                const btnMines = document.createElement('button');
+                btnMines.innerText = '💣 Мины (3 мины)';
+                btnMines.className = 'action-btn';
+                btnMines.onclick = () => attemptKill('mines');
+                container.appendChild(btnMines);
+            }
+        }
+
+        const btnMoney = document.createElement('button');
+        btnMoney.innerText = `💰 Подкуп (${currentEnemy.reward * 2} с.руб.)`;
+        btnMoney.className = 'action-btn';
+        btnMoney.onclick = () => attemptKill('money');
+        container.appendChild(btnMoney);
+    }
+
+    function resetGame() {
+        gameState = {
+            money: 5000,
+            army: 500,
+            civilians: 2000,
+            spec: 50,
+            mines: 20,
+            currentEnemyIndex: 0,
+            enemiesDefeated: 0
+        };
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML = '<p>⚔️ Новая игра. ОСС снова наступает...</p><p>💰 У вас 5000 саванских рублей. Защитите Геймо!</p>';
+        currentEnemy = { ...ENEMIES[Math.floor(Math.random() * ENEMIES.length)] };
+        document.getElementById('enemyName').innerHTML = `⚔️ ${currentEnemy.name} ⚔️`;
+        document.getElementById('enemyDesc').innerHTML = currentEnemy.desc;
+        renderActions();
+        updateUI();
+    }
+
+    // инициализация
+    resetGame();
+    document.getElementById('resetBtn').addEventListener('click', resetGame);
+</script>
+</body>
+                                          </html>
