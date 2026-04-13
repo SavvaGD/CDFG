@@ -5,20 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Blood War — CDFG Games</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: 'Courier New', 'Segoe UI', monospace;
-        }
-        .ui-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 10;
-        }
+        body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; }
+        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         .menu-panel {
             position: absolute;
             background: rgba(0,0,0,0.9);
@@ -31,91 +19,31 @@
             max-width: 90%;
             max-height: 90%;
             overflow-y: auto;
-            font-family: monospace;
         }
-        .menu-center {
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 450px;
-            max-width: 90%;
-        }
-        .menu-bottom {
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.9);
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            justify-content: center;
-            pointer-events: auto;
-            padding: 12px;
-        }
+        .menu-center { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; max-width: 90%; }
+        .menu-bottom { bottom: 20px; left: 20px; right: 20px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 12px; }
         button {
-            background: #3a0a0a;
-            border: 1px solid #aa3333;
-            color: #ffaaaa;
-            padding: 8px 16px;
-            border-radius: 40px;
-            font-family: monospace;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.1s;
-            pointer-events: auto;
+            background: #3a0a0a; border: 1px solid #aa3333; color: #ffaaaa; padding: 8px 16px;
+            border-radius: 40px; font-weight: bold; cursor: pointer; pointer-events: auto;
         }
         button:active { transform: scale(0.96); }
-        .stat {
-            display: inline-block;
-            background: #1a0505;
-            padding: 4px 12px;
-            border-radius: 20px;
-            margin: 4px;
-            font-size: 0.9rem;
-        }
-        .enemy-card {
-            background: #2a0a0a;
-            margin: 8px 0;
-            padding: 10px;
-            border-radius: 12px;
-            border-left: 3px solid #ff4444;
-            cursor: pointer;
-        }
-        h3 { color: #ff6666; margin: 8px 0; }
-        .resource-bar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 12px;
-        }
-        .wave-info {
-            background: #1a0505;
-            padding: 8px;
-            border-radius: 12px;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-        @media (max-width: 600px) {
-            .menu-center { width: 95%; padding: 12px; }
-            button { padding: 6px 10px; font-size: 0.7rem; }
-            .stat { font-size: 0.7rem; }
-        }
+        .stat { background: #1a0505; padding: 4px 12px; border-radius: 20px; margin: 4px; display: inline-block; }
+        .enemy-card { background: #2a0a0a; margin: 8px 0; padding: 10px; border-radius: 12px; border-left: 3px solid #ff4444; cursor: pointer; }
+        .resource-bar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 12px; }
+        .wave-info { background: #1a0505; padding: 8px; border-radius: 12px; text-align: center; margin-bottom: 10px; }
+        @media (max-width: 600px) { button { padding: 6px 10px; font-size: 0.7rem; } .stat { font-size: 0.7rem; } }
     </style>
 </head>
 <body>
     <div class="ui-overlay">
-        <!-- Экран выбора Саваи -->
         <div id="selectionScreen" class="menu-panel menu-center">
             <h2>🔥 BLOOD WAR 🔥</h2>
-            <p>3046 год. Вы — правитель Геймо. Выберите Саваю:</p>
+            <p>3046 год. Выберите Саваю:</p>
             <div id="savaiList"></div>
             <button id="startWarBtn" disabled style="margin-top:16px;">⚔️ НАЧАТЬ ВОЙНУ ⚔️</button>
         </div>
-
-        <!-- Экран боя -->
         <div id="battleScreen" style="display:none;">
-            <div class="menu-panel menu-bottom" id="actionPanel">
+            <div class="menu-panel menu-bottom" style="background:rgba(0,0,0,0.95);">
                 <div class="resource-bar">
                     <span class="stat">💰 <span id="money">5000</span> Г.долл.</span>
                     <span class="stat">⚔️ <span id="infantry">0</span> пехота</span>
@@ -125,7 +53,7 @@
                     <span class="stat">🛡️ <span id="heavy">0</span> броня</span>
                 </div>
                 <div class="wave-info" id="waveInfo">⚔️ ВОЛНА 0 / 0 ⚔️</div>
-                <div id="shopPanel" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center;">
+                <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center;">
                     <button id="buyInfantry">⚔️ Пехота (100💰)</button>
                     <button id="buySpec">🎯 Спец (200💰)</button>
                     <button id="buyDrone">🛸 Дрон (250💰)</button>
@@ -148,21 +76,16 @@
     </div>
 
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
-            }
-        }
+        { "imports": { "three": "https://unpkg.com/three@0.128.0/build/three.module.js" } }
     </script>
 
     <script type="module">
         import * as THREE from 'three';
         
-        // ---------- САВАИ ----------
         const SAVAI_LIST = [
-            { name: "Этерия", fullName: "Этерийская Савая", oldName: "Республика Этерия", capital: "Астраполис", budget: 100000, enemiesTotal: 100, description: "Бедная, но гордая. Мало ресурсов, но фанатичны." },
-            { name: "Новая Савая", fullName: "Новая Савая", oldName: "Новосавайское царство", capital: "Оло (бывшая — Прелия)", budget: 1000000, enemiesTotal: 1000, description: "Средняя сила. Хорошо организованная армия." },
-            { name: "Саванкатр", fullName: "Саванкатровская Савая", oldName: "Михаилское княжество", capital: "Саванград (бывшая — Проннская земля)", budget: 1000000000, enemiesTotal: 100000, description: "Сердце ОСС. Огромная армия. Элитные войска." }
+            { name: "Этерия", fullName: "Этерийская Савая", oldName: "Республика Этерия", capital: "Астраполис", budget: 100000, enemiesTotal: 100, description: "Бедная, но гордая." },
+            { name: "Новая Савая", fullName: "Новая Савая", oldName: "Новосавайское царство", capital: "Оло", budget: 1000000, enemiesTotal: 1000, description: "Средняя сила." },
+            { name: "Саванкатр", fullName: "Саванкатровская Савая", oldName: "Михаилское княжество", capital: "Саванград", budget: 1000000000, enemiesTotal: 100000, description: "Сердце ОСС." }
         ];
         
         let selectedSavai = null;
@@ -178,13 +101,11 @@
         scene.fog = new THREE.FogExp2(0x1a0202, 0.008);
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(15, 12, 20);
-        camera.lookAt(0, 0, 0);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
         
-        // Освещение
         const ambientLight = new THREE.AmbientLight(0x332222);
         scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xffaa88, 1);
@@ -192,7 +113,6 @@
         dirLight.castShadow = true;
         scene.add(dirLight);
         
-        // Земля
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x4a2a2a, roughness: 0.8 }));
         ground.rotation.x = -Math.PI/2;
         ground.position.y = -0.5;
@@ -257,36 +177,11 @@
         function updateBattlefield() {
             clearUnits();
             let x = -8, z = 2;
-            let i=0;
-            for(i=0; i<Math.min(army.infantry, 15); i++) units.push(addUnit(x + (i%5)*1.2, z - Math.floor(i/5)*1.2, 0x44aa44, 'infantry'));
-            for(i=0; i<Math.min(army.spec, 10); i++) units.push(addUnit(x + (i%4)*1.3, z-2 - Math.floor(i/4)*1.3, 0x44aaff, 'spec'));
-            for(i=0; i<Math.min(army.drones, 10); i++) units.push(addUnit(x + (i%4)*1.1, z-4 - Math.floor(i/4)*1.1, 0x88aaff, 'drone'));
-            for(i=0; i<Math.min(army.tanks, 8); i++) units.push(addUnit(x + (i%3)*1.4, z-6 - Math.floor(i/3)*1.4, 0xaa8866, 'tank'));
-            for(i=0; i<Math.min(army.heavy, 5); i++) units.push(addUnit(x + (i%2)*1.6, z-8 - Math.floor(i/2)*1.6, 0xcc8866, 'heavy'));
-        }
-        
-        // UI
-        const selectionScreen = document.getElementById('selectionScreen');
-        const battleScreen = document.getElementById('battleScreen');
-        const victoryScreen = document.getElementById('victoryScreen');
-        const defeatScreen = document.getElementById('defeatScreen');
-        const savaiListDiv = document.getElementById('savaiList');
-        const startWarBtn = document.getElementById('startWarBtn');
-        
-        function renderSavaiList() {
-            savaiListDiv.innerHTML = '';
-            SAVAI_LIST.forEach(s => {
-                const card = document.createElement('div');
-                card.className = 'enemy-card';
-                card.innerHTML = `<strong>${s.name}</strong><br>💰 Бюджет: ${s.budget.toLocaleString()} с.руб.<br>⚔️ Врагов: ${s.enemiesTotal.toLocaleString()}<br><small>${s.description}</small>`;
-                card.onclick = () => {
-                    document.querySelectorAll('.enemy-card').forEach(c => c.style.borderLeft = '3px solid #ff4444');
-                    card.style.borderLeft = '3px solid #00ff00';
-                    selectedSavai = s;
-                    startWarBtn.disabled = false;
-                };
-                savaiListDiv.appendChild(card);
-            });
+            for(let i=0; i<Math.min(army.infantry, 15); i++) addUnit(x + (i%5)*1.2, z - Math.floor(i/5)*1.2, 0x44aa44, 'infantry');
+            for(let i=0; i<Math.min(army.spec, 10); i++) addUnit(x + (i%4)*1.3, z-2 - Math.floor(i/4)*1.3, 0x44aaff, 'spec');
+            for(let i=0; i<Math.min(army.drones, 10); i++) addUnit(x + (i%4)*1.1, z-4 - Math.floor(i/4)*1.1, 0x88aaff, 'drone');
+            for(let i=0; i<Math.min(army.tanks, 8); i++) addUnit(x + (i%3)*1.4, z-6 - Math.floor(i/3)*1.4, 0xaa8866, 'tank');
+            for(let i=0; i<Math.min(army.heavy, 5); i++) addUnit(x + (i%2)*1.6, z-8 - Math.floor(i/2)*1.6, 0xcc8866, 'heavy');
         }
         
         function updateUI() {
@@ -317,9 +212,7 @@
         
         function nextWave() {
             if (!gameActive) return;
-            // Сила армии Геймо
             let power = army.infantry*10 + army.spec*15 + army.drones*20 + army.tanks*45 + army.heavy*90;
-            // Сила волны (зависит от бюджета Саваи и номера волны)
             let wavePower = (50 + currentWave * 3) * (selectedSavai.budget / 100000);
             let success = power >= wavePower;
             
@@ -330,13 +223,9 @@
                 currentWave++;
                 updateUI();
                 updateBattlefield();
-                if (currentWave >= selectedSavai.enemiesTotal) {
-                    victory();
-                } else {
-                    document.getElementById('waveInfo').innerHTML = `⚔️ ВОЛНА ${currentWave} ОТБИТА! +${reward}💰 ⚔️<br>ОСТАЛОСЬ ВРАГОВ: ${enemiesRemaining}`;
-                }
+                if (currentWave >= selectedSavai.enemiesTotal) victory();
+                else document.getElementById('waveInfo').innerHTML = `✅ ВОЛНА ${currentWave} ОТБИТА! +${reward}💰 | ВРАГОВ ОСТАЛОСЬ: ${enemiesRemaining}`;
             } else {
-                // Потери
                 army.infantry = Math.max(0, Math.floor(army.infantry * 0.7));
                 army.spec = Math.max(0, Math.floor(army.spec * 0.7));
                 army.drones = Math.max(0, Math.floor(army.drones * 0.7));
@@ -344,18 +233,15 @@
                 army.heavy = Math.max(0, Math.floor(army.heavy * 0.7));
                 updateUI();
                 updateBattlefield();
-                if (army.infantry===0 && army.spec===0 && army.drones===0 && army.tanks===0 && army.heavy===0) {
-                    defeat();
-                } else {
-                    document.getElementById('waveInfo').innerHTML = `💥 ВОЛНА ${currentWave+1} НЕ ОТБИТА! ПОТЕРИ! 💥<br>ОСТАЛОСЬ ВРАГОВ: ${enemiesRemaining}`;
-                }
+                if (army.infantry===0 && army.spec===0 && army.drones===0 && army.tanks===0 && army.heavy===0) defeat();
+                else document.getElementById('waveInfo').innerHTML = `💥 ВОЛНА ${currentWave+1} НЕ ОТБИТА! ПОТЕРИ! | ВРАГОВ ОСТАЛОСЬ: ${enemiesRemaining}`;
             }
         }
         
         function startWar() {
             if (!selectedSavai) return;
-            selectionScreen.style.display = 'none';
-            battleScreen.style.display = 'block';
+            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('battleScreen').style.display = 'block';
             gameActive = true;
             currentWave = 0;
             enemiesRemaining = selectedSavai.enemiesTotal;
@@ -368,26 +254,27 @@
         
         function victory() {
             gameActive = false;
-            victoryScreen.style.display = 'flex';
+            document.getElementById('victoryScreen').style.display = 'flex';
             document.getElementById('victoryText').innerHTML = `Вы уничтожили ${selectedSavai.name}! Геймо выстоял.`;
         }
         
         function defeat() {
             gameActive = false;
-            defeatScreen.style.display = 'flex';
+            document.getElementById('defeatScreen').style.display = 'flex';
         }
         
         function resetGame() {
-            victoryScreen.style.display = 'none';
-            defeatScreen.style.display = 'none';
-            selectionScreen.style.display = 'flex';
-            battleScreen.style.display = 'none';
+            document.getElementById('victoryScreen').style.display = 'none';
+            document.getElementById('defeatScreen').style.display = 'none';
+            document.getElementById('selectionScreen').style.display = 'flex';
+            document.getElementById('battleScreen').style.display = 'none';
             selectedSavai = null;
-            startWarBtn.disabled = true;
+            document.getElementById('startWarBtn').disabled = true;
             gameActive = false;
             clearUnits();
         }
         
+        // Назначение кнопок
         document.getElementById('buyInfantry').onclick = () => buy('infantry', 100);
         document.getElementById('buySpec').onclick = () => buy('spec', 200);
         document.getElementById('buyDrone').onclick = () => buy('drone', 250);
@@ -397,30 +284,43 @@
         document.getElementById('resetGameBtn').onclick = () => resetGame();
         document.getElementById('resetDefeatBtn').onclick = () => resetGame();
         
+        function renderSavaiList() {
+            const container = document.getElementById('savaiList');
+            container.innerHTML = '';
+            SAVAI_LIST.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'enemy-card';
+                card.innerHTML = `<strong>${s.name}</strong><br>💰 Бюджет: ${s.budget.toLocaleString()} с.руб.<br>⚔️ Врагов: ${s.enemiesTotal.toLocaleString()}<br><small>${s.description}</small>`;
+                card.onclick = () => {
+                    document.querySelectorAll('.enemy-card').forEach(c => c.style.borderLeft = '3px solid #ff4444');
+                    card.style.borderLeft = '3px solid #00ff00';
+                    selectedSavai = s;
+                    document.getElementById('startWarBtn').disabled = false;
+                };
+                container.appendChild(card);
+            });
+        }
+        
+        document.getElementById('startWarBtn').onclick = () => startWar();
         renderSavaiList();
         
         let time = 0;
-        function animateCamera() {
-            if (!gameActive) return;
-            time += 0.01;
-            camera.position.x = 15 + Math.sin(time) * 0.5;
-            camera.position.z = 20 + Math.cos(time*0.7) * 0.5;
-            camera.lookAt(0, 0, 0);
-        }
-        
-        function renderLoop() {
-            animateCamera();
+        function animate() {
+            if (gameActive) {
+                time += 0.01;
+                camera.position.x = 15 + Math.sin(time) * 0.5;
+                camera.position.z = 20 + Math.cos(time*0.7) * 0.5;
+                camera.lookAt(0, 0, 0);
+            }
             renderer.render(scene, camera);
-            requestAnimationFrame(renderLoop);
+            requestAnimationFrame(animate);
         }
-        
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
-        
-        renderLoop();
+        animate();
     </script>
 </body>
-    </html>
+</html>
