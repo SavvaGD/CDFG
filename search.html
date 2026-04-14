@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>CDFG Search — приватный поиск</title>
     <style>
         * {
@@ -16,12 +16,16 @@
             background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
             color: #e2e8f0;
             min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 700px;
+            width: 100%;
             margin: 0 auto;
-            padding: 2rem 1rem;
         }
 
         .header {
@@ -51,6 +55,7 @@
 
         .search-box {
             display: flex;
+            flex-wrap: nowrap;
             gap: 0.5rem;
             background: rgba(30, 41, 59, 0.8);
             border-radius: 60px;
@@ -60,6 +65,7 @@
 
         .search-box input {
             flex: 1;
+            min-width: 0;
             background: transparent;
             border: none;
             padding: 0.8rem 1.2rem;
@@ -81,6 +87,8 @@
             font-weight: bold;
             cursor: pointer;
             transition: transform 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .search-box button:hover {
@@ -148,28 +156,6 @@
             color: #ef4444;
         }
 
-        .more-link {
-            text-align: center;
-            margin: 2rem 0;
-        }
-
-        .more-link a {
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid #00ff88;
-            border-radius: 40px;
-            padding: 0.7rem 2rem;
-            color: #00ff88;
-            font-weight: bold;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.2s;
-        }
-
-        .more-link a:hover {
-            background: rgba(0, 255, 136, 0.1);
-            transform: scale(1.02);
-        }
-
         .info {
             text-align: center;
             padding: 1rem;
@@ -178,9 +164,12 @@
             margin-top: 2rem;
         }
 
-        @media (max-width: 600px) {
-            .container { padding: 1rem; }
-            .search-box button { padding: 0.8rem 1rem; }
+        @media (max-width: 550px) {
+            .logo { font-size: 1.8rem; }
+            .search-box button { padding: 0.6rem 1rem; font-size: 0.8rem; }
+            .search-box input { padding: 0.6rem 1rem; font-size: 0.9rem; }
+            .result-title { font-size: 0.95rem; }
+            .result-snippet { font-size: 0.75rem; }
         }
     </style>
 </head>
@@ -204,7 +193,6 @@
 
         <div class="info">
             🔒 Анонимный поиск | Без истории | Без слежки
-            <button onclick="location.href='index.html'" style="background: rgba(30,41,59,0.8); border: 1px solid #00ff88; color: #00ff88; padding: 0.5rem 1rem; border-radius: 40px; cursor: pointer;">🏠 CDFG Browser</button>
         </div>
     </div>
 
@@ -212,8 +200,6 @@
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         const resultsContainer = document.getElementById('resultsContainer');
-        
-        let currentQuery = '';
 
         async function search() {
             const query = searchInput.value.trim();
@@ -223,11 +209,9 @@
                 return;
             }
 
-            currentQuery = query;
             resultsContainer.innerHTML = '<div class="loading">🔍 Ищем...</div>';
 
             try {
-                // Используем DuckDuckGo через JSONP
                 const script = document.createElement('script');
                 const callbackName = 'ddgCallback' + Date.now();
                 
@@ -251,7 +235,7 @@
                             </div>
                         `;
                     }
-                }, 8000);
+                }, 10000);
                 
             } catch (error) {
                 resultsContainer.innerHTML = `
@@ -266,7 +250,6 @@
         function displayResults(data, query) {
             const results = [];
             
-            // Основной ответ
             if (data.AbstractText) {
                 results.push({
                     title: data.AbstractSource || 'Результат',
@@ -275,7 +258,6 @@
                 });
             }
             
-            // Связанные темы
             if (data.RelatedTopics && data.RelatedTopics.length > 0) {
                 for (let topic of data.RelatedTopics) {
                     if (typeof topic === 'object' && topic.Text) {
@@ -289,7 +271,7 @@
                             snippet: text.length > 200 ? text.substring(0, 200) + '...' : text
                         });
                     }
-                    if (results.length >= 12) break;
+                    if (results.length >= 15) break;
                 }
             }
             
@@ -298,8 +280,8 @@
                     <div class="no-results">
                         😕 Ничего не найдено по запросу «${escapeHtml(query)}»
                     </div>
-                    <div class="more-link">
-                        <a href="https://duckduckgo.com/?q=${encodeURIComponent(query)}" target="_blank">🔍 Искать на DuckDuckGo →</a>
+                    <div class="result-item">
+                        <div class="result-title"><a href="https://duckduckgo.com/?q=${encodeURIComponent(query)}" target="_blank">🔍 Искать на DuckDuckGo →</a></div>
                     </div>
                 `;
                 return;
@@ -315,12 +297,6 @@
                     </div>
                 `;
             }
-            
-            html += `
-                <div class="more-link">
-                    <a href="https://duckduckgo.com/?q=${encodeURIComponent(query)}" target="_blank">📥 Показать ещё на DuckDuckGo →</a>
-                </div>
-            `;
             
             resultsContainer.innerHTML = html;
         }
